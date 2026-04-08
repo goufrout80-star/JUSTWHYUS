@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  background-color: #080808;
+  overflow: hidden;
+}
+
+/* Glitch animation */
+@keyframes glitch1 {
+  0%, 90%, 100% { transform: translate(0); opacity: 0; }
+  91%  { transform: translate(-4px, 0); opacity: 0.8; }
+  93%  { transform: translate(4px, 0);  opacity: 0.6; }
+  95%  { transform: translate(-2px, 0); opacity: 0.9; }
+  97%  { transform: translate(0);       opacity: 0;   }
+}
+@keyframes glitch2 {
+  0%, 90%, 100% { transform: translate(0); opacity: 0; }
+  91.5% { transform: translate(3px, 0);  opacity: 0.7; }
+  93.5% { transform: translate(-3px, 0); opacity: 0.5; }
+  95.5% { transform: translate(0);       opacity: 0;   }
+}
+@keyframes blink {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 1;    }
+}
+
+.glitch-title {
+  position: relative;
+}
+
+.glitch-title::before,
+.glitch-title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.glitch-title::before {
+  color: #2BDBA4;
+  clip-path: inset(0 0 67% 0);
+  animation: glitch1 5s infinite;
+}
+
+.glitch-title::after {
+  color: #22aaff;
+  clip-path: inset(60% 0 0 0);
+  animation: glitch2 5s infinite;
+}
+
+/* ── Dot grid pattern ── */
+.dot-grid {
+  background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232BDBA4' fill-opacity='0.07'%3E%3Ccircle cx='1' cy='1' r='1'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ── Blink separator ── */
+.blink-colon {
+  animation: blink 1.4s ease-in-out infinite;
+}
+
+/* ── Diamond pulse ── */
+@keyframes pulse-diamond {
+  0%, 100% {
+    transform: rotate(45deg) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: rotate(45deg) scale(1.4);
+    opacity: 1;
+  }
+}
+
+.pulse-diamond {
+  animation: pulse-diamond 2s ease-in-out infinite;
+}
+
+/* ── Expanding bar ── */
+@keyframes expand-bar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.expand-bar {
+  animation: expand-bar 1.5s ease-out 1.2s forwards;
+  width: 0%;
+}
+
+/* ── Teal flash on countdown change ── */
+@keyframes flash-teal {
+  0% { color: #2BDBA4; }
+  100% { color: #F0EBD8; }
+}
+
+.flash-teal {
+  animation: flash-teal 0.2s ease-out;
+}
