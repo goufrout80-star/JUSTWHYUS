@@ -18,6 +18,16 @@ if (!supabaseUrl || !supabaseKey) {
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
   supabaseKey || 'placeholder-anon-key',
+  {
+    auth: {
+      storageKey: 'sb-jwu-auth',
+      // Prevent the 5-second navigator lock timeout that causes hangs when
+      // multiple components call getSession() concurrently (React renders).
+      lock: 'no-op' as 'no-op',
+      detectSessionInUrl: true,
+      persistSession: true,
+    },
+  },
 )
 
 export const signIn = async (email: string, password: string) => {
