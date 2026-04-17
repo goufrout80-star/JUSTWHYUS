@@ -235,14 +235,16 @@ export default function TeamPanel({
                           textTransform: 'uppercase',
                           padding: '3px 8px',
                           borderRadius: 999,
-                          color: inv.role === 'super_admin' ? TEAL : 'rgba(240,235,216,0.8)',
+                          color: inv.role === 'super_admin' ? TEAL : inv.role === 'feedback_user' ? '#FFB23C' : 'rgba(240,235,216,0.8)',
                           backgroundColor:
                             inv.role === 'super_admin'
                               ? 'rgba(43,219,164,0.1)'
-                              : 'rgba(240,235,216,0.05)',
+                              : inv.role === 'feedback_user'
+                                ? 'rgba(255,178,60,0.1)'
+                                : 'rgba(240,235,216,0.05)',
                         }}
                       >
-                        {inv.role === 'super_admin' ? 'Super' : 'Admin'}
+                        {inv.role === 'super_admin' ? 'Super' : inv.role === 'feedback_user' ? 'Feedback' : 'Admin'}
                       </span>
                     </td>
                     <td style={{ ...tdStyle, color: expired ? CORAL : 'rgba(240,235,216,0.5)' }}>
@@ -338,14 +340,16 @@ export default function TeamPanel({
                           textTransform: 'uppercase',
                           padding: '3px 8px',
                           borderRadius: 999,
-                          color: a.role === 'super_admin' ? TEAL : 'rgba(240,235,216,0.8)',
+                          color: a.role === 'super_admin' ? TEAL : a.role === 'feedback_user' ? '#FFB23C' : 'rgba(240,235,216,0.8)',
                           backgroundColor:
                             a.role === 'super_admin'
                               ? 'rgba(43,219,164,0.1)'
-                              : 'rgba(240,235,216,0.05)',
+                              : a.role === 'feedback_user'
+                                ? 'rgba(255,178,60,0.1)'
+                                : 'rgba(240,235,216,0.05)',
                         }}
                       >
-                        {a.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                        {a.role === 'super_admin' ? 'Super Admin' : a.role === 'feedback_user' ? 'Feedback User' : 'Admin'}
                       </span>
                     </td>
                     <td style={tdStyle}>
