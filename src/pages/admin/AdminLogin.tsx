@@ -221,23 +221,9 @@ export default function AdminLogin() {
     }
     setLoading(true)
     try {
-      // Verify the email exists in admins table
-      const { data: adminRow } = await supabase
-        .from('admins')
-        .select('email, display_name')
-        .ilike('email', resetEmail.trim())
-        .maybeSingle()
-
-      if (!adminRow) {
-        setErrorMsg('Email not found in admin system.')
-        setError(true)
-        setLoading(false)
-        return
-      }
-
-      // Send OTP code
+      // Send OTP code directly (edge function will verify user exists)
       const resp = await supabase.functions.invoke('send-otp-email', {
-        body: { email: adminRow.email, name: adminRow.display_name || 'Admin', purpose: 'password_reset' },
+        body: { email: resetEmail.trim(), name: 'Admin', purpose: 'password_reset' },
       })
       console.log('[send-otp-email] reset response:', resp)
       if (resp.error || !resp.data?.ok) {
