@@ -9,7 +9,7 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { renderInviteEmail } from '../_shared/email-template.ts'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const FROM = 'JUST WHY US <invitation@justwhyus.com>'
+const FROM = 'JUST WHY US <noreply@justwhyus.com>'
 const SITE_URL =
   Deno.env.get('PUBLIC_SITE_URL') ?? 'https://justwhyus.com'
 interface Payload {
