@@ -338,7 +338,14 @@ export default function InviteClaim() {
               textAlign: 'center',
             }}
           >
-            Code sent from invitation@justwhyus.com · valid 5 minutes
+            Code sent from noreply@justwhyus.com · valid 5 minutes
+          </div>
+          <div style={{
+            marginTop: 8, fontSize: 11, color: 'rgba(240,235,216,0.35)', fontStyle: 'italic',
+            backgroundColor: 'rgba(255,92,56,0.08)', padding: '8px 12px', borderRadius: 4,
+            border: '1px solid rgba(255,92,56,0.2)', textAlign: 'center',
+          }}>
+            ⚠️ If not received, check your spam folder
           </div>
         </div>
       </main>
@@ -353,9 +360,16 @@ export default function InviteClaim() {
           <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
             Check your email
           </h1>
-          <p style={{ color: 'rgba(240,235,216,0.55)', fontSize: 13, marginBottom: 20 }}>
+          <p style={{ color: 'rgba(240,235,216,0.55)', fontSize: 13, marginBottom: 12 }}>
             We sent a 6-digit code to <strong style={{ color: CREAM }}>{emailInput}</strong>.
           </p>
+          <div style={{
+            fontSize: 11, color: 'rgba(240,235,216,0.35)', fontStyle: 'italic',
+            backgroundColor: 'rgba(255,92,56,0.08)', padding: '8px 12px', borderRadius: 4,
+            border: '1px solid rgba(255,92,56,0.2)', marginBottom: 16,
+          }}>
+            ⚠️ If not received, check your spam folder
+          </div>
           <form onSubmit={handleOtpSubmit}>
             <input
               type="text"

@@ -116,6 +116,8 @@ export default function InviteModal({ open, onClose, onCreateInvite }: Props) {
       }
 
       setEmailSent(true)
+      setName('')
+      setEmail('')
     } catch (err: unknown) {
       setBusy(false)
       const msg = err instanceof Error ? err.message : 'unknown'
@@ -396,8 +398,15 @@ export default function InviteModal({ open, onClose, onCreateInvite }: Props) {
             <div style={{ fontSize: 14, color: CREAM, marginBottom: 6 }}>
               Invite sent to <strong>{email}</strong>
             </div>
-            <div style={{ fontSize: 12, color: 'rgba(240,235,216,0.5)' }}>
-              From: invitation@justwhyus.com · valid for 6 hours
+            <div style={{ fontSize: 12, color: 'rgba(240,235,216,0.5)', marginBottom: 4 }}>
+              From: noreply@justwhyus.com · valid for 6 hours
+            </div>
+            <div style={{
+              fontSize: 11, color: 'rgba(240,235,216,0.35)', fontStyle: 'italic',
+              backgroundColor: 'rgba(255,92,56,0.08)', padding: '8px 12px', borderRadius: 4,
+              border: '1px solid rgba(255,92,56,0.2)', marginTop: 8,
+            }}>
+              ⚠️ If not received, check your spam folder
             </div>
             <button
               onClick={reset}
