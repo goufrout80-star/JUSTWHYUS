@@ -24,7 +24,8 @@ export const supabase = createClient(
       detectSessionInUrl: true,
       persistSession: true,
       // Bypass navigator.locks to prevent 5-second hangs from orphaned locks
-      lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<unknown>) => fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => fn(),
     },
   },
 )
