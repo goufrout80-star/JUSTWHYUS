@@ -41,7 +41,6 @@ export default function AdminLogin() {
   // Forgot password state
   const [resetEmail, setResetEmail] = useState('')
   const [resetCode, setResetCode] = useState('')
-  const [resetCodeSent, setResetCodeSent] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
   const [resetSuccess, setResetSuccess] = useState(false)
@@ -249,7 +248,6 @@ export default function AdminLogin() {
         setError(true)
         return
       }
-      setResetCodeSent(true)
       setView('forgot_code')
     } catch (err) {
       console.error('[send-otp-email] catch:', err)
