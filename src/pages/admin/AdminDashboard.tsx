@@ -51,6 +51,7 @@ export default function AdminDashboard() {
     removeAdmin,
     setAdminMfaRequired,
     setGlobalMfaRequired,
+    refetch,
   } = useAdminData(actor)
 
   const [tab, setTab] = useState<Tab>('brands')
@@ -231,6 +232,7 @@ export default function AdminDashboard() {
           onRemoveAdmin={removeAdmin}
           onSetAdminMfaRequired={setAdminMfaRequired}
           onSetGlobalMfaRequired={setGlobalMfaRequired}
+          onRefresh={refetch}
         />
       )}
       {tab === 'activity' && (

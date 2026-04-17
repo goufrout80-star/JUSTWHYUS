@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { ADMIN_BASE, ADMIN_SETUP_2FA } from '../../config/security'
+import { useSessionExpiry } from '../../hooks/useSessionExpiry'
 
 interface Props {
   children: React.ReactNode
@@ -14,6 +15,8 @@ interface Props {
 export default function ProtectedRoute({ children, allowPending2FA }: Props) {
   const location = useLocation()
   const { session, isAdmin, mfaPending, mfaChallengeRequired, loading } = useAdminAuth()
+  // Enforce hybrid session timeout (4h absolute + 30min idle) on every admin page
+  useSessionExpiry()
 
   if (loading) {
     return (

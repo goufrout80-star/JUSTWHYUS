@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AdminRow, PendingInvite, AppSettingsRow } from '../../hooks/useAdminData'
+import InviteModal from './InviteModal'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -14,15 +15,17 @@ interface Props {
   currentEmail: string
   isSuper: boolean
   onCreateInvite: (
-    email: string,
+    email: string | null,
     name: string,
     role: 'admin' | 'super_admin',
+    delivery: 'link' | 'email',
   ) => Promise<{ data: PendingInvite | null; error: unknown }>
-  onRevokeInvite: (id: string, email: string) => Promise<{ error: unknown }>
+  onRevokeInvite: (id: string, email: string | null) => Promise<{ error: unknown }>
   onRegenerateInvite: (id: string) => Promise<{ data: PendingInvite | null; error: unknown }>
   onRemoveAdmin: (id: string, email: string) => Promise<{ error: unknown }>
   onSetAdminMfaRequired: (id: string, required: boolean) => Promise<{ error: unknown }>
   onSetGlobalMfaRequired: (required: boolean) => Promise<{ error: unknown }>
+  onRefresh?: () => Promise<void> | void
 }
 
 function formatDate(iso: string) {
@@ -53,39 +56,18 @@ export default function TeamPanel({
   onRemoveAdmin,
   onSetAdminMfaRequired,
   onSetGlobalMfaRequired,
+  onRefresh,
 }: Props) {
-  const [email, setEmail] = useState('')
-  const [name, setName] = useState('')
-  const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [generatedLink, setGeneratedLink] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setGeneratedLink(null)
-    setSubmitting(true)
-    const { data, error: err } = await onCreateInvite(email, name, role)
-    setSubmitting(false)
-    if (err || !data) {
-      setError('Failed to create invite (email may already have a pending invite).')
-      return
-    }
-    setGeneratedLink(`${origin}/invite/${data.token}`)
-    setEmail('')
-    setName('')
-    setRole('admin')
-  }
-
-  const copyLink = (link: string) => {
+  const copyLink = (link: string, id?: string) => {
     navigator.clipboard.writeText(link).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
+      setCopiedId(id ?? link)
+      setTimeout(() => setCopiedId(null), 1800)
     })
   }
 
@@ -136,150 +118,64 @@ export default function TeamPanel({
         </div>
       )}
 
-      {/* Invite form — super admin only */}
+      {/* Invite button + refresh */}
       {isSuper && (
         <div
           style={{
-            backgroundColor: INK,
-            border: '1px solid rgba(43,219,164,0.12)',
-            borderRadius: 8,
-            padding: 24,
+            display: 'flex',
+            gap: 12,
             marginBottom: 20,
+            flexWrap: 'wrap',
+            alignItems: 'center',
           }}
         >
-          <div
+          <button
+            onClick={() => setModalOpen(true)}
             style={{
               fontFamily: 'Inter, sans-serif',
-              fontWeight: 700,
-              fontSize: 13,
-              color: CREAM,
-              marginBottom: 16,
-              letterSpacing: '0.1em',
+              fontWeight: 800,
+              fontSize: 12,
+              letterSpacing: '0.2em',
               textTransform: 'uppercase',
+              color: VOID,
+              backgroundColor: TEAL,
+              border: 'none',
+              borderRadius: 4,
+              padding: '12px 22px',
+              cursor: 'pointer',
             }}
           >
-            Generate Invite Link
-          </div>
-          <form onSubmit={handleCreate} style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              required
-              placeholder="Display name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={inputStyle}
-            />
-            <input
-              type="email"
-              required
-              placeholder="admin@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={{ ...inputStyle, minWidth: 240 }}
-            />
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as 'admin' | 'super_admin')}
-              style={{ ...inputStyle, minWidth: 140 }}
-            >
-              <option value="admin">Admin</option>
-              <option value="super_admin">Super Admin</option>
-            </select>
+            + Invite Team Member
+          </button>
+          {onRefresh && (
             <button
-              type="submit"
-              disabled={submitting}
+              onClick={() => onRefresh()}
+              title="Refresh data"
               style={{
                 fontFamily: 'Inter, sans-serif',
                 fontWeight: 700,
-                fontSize: 12,
-                letterSpacing: '0.15em',
+                fontSize: 11,
+                letterSpacing: '0.2em',
                 textTransform: 'uppercase',
-                color: VOID,
-                backgroundColor: TEAL,
-                border: 'none',
+                color: CREAM,
+                background: 'transparent',
+                border: `1px solid ${CREAM}30`,
                 borderRadius: 4,
-                padding: '10px 20px',
-                cursor: submitting ? 'wait' : 'pointer',
-                opacity: submitting ? 0.6 : 1,
+                padding: '10px 16px',
+                cursor: 'pointer',
               }}
             >
-              {submitting ? 'Generating...' : 'Generate Link'}
+              ⟳ Refresh
             </button>
-          </form>
-
-          {error && <div style={{ marginTop: 12, fontSize: 12, color: CORAL }}>{error}</div>}
-
-          {generatedLink && (
-            <div
-              style={{
-                marginTop: 16,
-                padding: 14,
-                backgroundColor: VOID,
-                borderRadius: 6,
-                border: `1px solid ${TEAL}40`,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  color: TEAL,
-                  fontWeight: 700,
-                  letterSpacing: '0.2em',
-                  textTransform: 'uppercase',
-                  marginBottom: 8,
-                }}
-              >
-                ✓ Invite created — copy & send to the invitee
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <code
-                  style={{
-                    flex: 1,
-                    padding: 10,
-                    backgroundColor: '#000',
-                    borderRadius: 4,
-                    fontFamily: 'ui-monospace, monospace',
-                    fontSize: 12,
-                    color: CREAM,
-                    overflowX: 'auto',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {generatedLink}
-                </code>
-                <button
-                  onClick={() => copyLink(generatedLink)}
-                  style={{
-                    padding: '8px 14px',
-                    backgroundColor: copied ? TEAL : 'transparent',
-                    color: copied ? VOID : CREAM,
-                    border: `1px solid ${copied ? TEAL : CREAM + '30'}`,
-                    borderRadius: 4,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: '0.2em',
-                    textTransform: 'uppercase',
-                    cursor: 'pointer',
-                    fontFamily: 'Inter, sans-serif',
-                  }}
-                >
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <div
-                style={{
-                  marginTop: 10,
-                  fontSize: 11,
-                  color: 'rgba(240,235,216,0.5)',
-                  fontStyle: 'italic',
-                }}
-              >
-                Single-use · valid for 6 hours · works only for this email.
-              </div>
-            </div>
           )}
         </div>
       )}
+
+      <InviteModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreateInvite={onCreateInvite}
+      />
 
       {/* Pending invites */}
       {isSuper && invites.length > 0 && (
@@ -314,7 +210,20 @@ export default function TeamPanel({
                   <tr key={inv.id} style={{ borderBottom: '1px solid #0D1A14' }}>
                     <td style={tdStyle}>
                       <div style={{ fontWeight: 700, color: CREAM }}>{inv.display_name}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(240,235,216,0.5)' }}>{inv.email}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(240,235,216,0.5)' }}>
+                        {inv.email ?? <em style={{ color: 'rgba(240,235,216,0.35)' }}>link only · email TBD</em>}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.2em',
+                          color: inv.delivery === 'email' ? TEAL : 'rgba(240,235,216,0.4)',
+                          marginTop: 2,
+                        }}
+                      >
+                        {inv.delivery === 'email' ? '✉ EMAIL SENT' : '🔗 LINK'}
+                      </div>
                     </td>
                     <td style={tdStyle}>
                       <span
@@ -342,19 +251,25 @@ export default function TeamPanel({
                     <td style={tdStyle}>
                       <button
                         onClick={() => {
-                          const link = `${origin}/invite/${inv.token}`
-                          copyLink(link)
+                          const suffix = inv.delivery === 'email' ? '?preverified=1' : ''
+                          copyLink(`${origin}/invite/${inv.token}${suffix}`, inv.id)
                         }}
-                        style={linkBtnStyle}
+                        style={{
+                          ...linkBtnStyle,
+                          color: copiedId === inv.id ? TEAL : CREAM,
+                        }}
                       >
-                        Copy link
+                        {copiedId === inv.id ? '✓ Copied' : 'Copy link'}
                       </button>
                     </td>
                     <td style={tdStyle}>
                       <button
                         onClick={async () => {
                           const { data } = await onRegenerateInvite(inv.id)
-                          if (data) copyLink(`${origin}/invite/${data.token}`)
+                          if (data) {
+                            const suffix = data.delivery === 'email' ? '?preverified=1' : ''
+                            copyLink(`${origin}/invite/${data.token}${suffix}`, data.id)
+                          }
                         }}
                         style={{ ...linkBtnStyle, color: TEAL }}
                       >
@@ -508,19 +423,6 @@ export default function TeamPanel({
       </div>
     </div>
   )
-}
-
-const inputStyle: React.CSSProperties = {
-  backgroundColor: VOID,
-  border: `1px solid ${INK}`,
-  borderRadius: 4,
-  padding: '10px 14px',
-  fontFamily: 'Inter, sans-serif',
-  fontWeight: 400,
-  fontSize: 13,
-  color: CREAM,
-  outline: 'none',
-  minWidth: 180,
 }
 
 const thStyle: React.CSSProperties = {

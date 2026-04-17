@@ -13,6 +13,7 @@ import {
   formatLockoutMs,
   logSecurityEvent,
 } from '../../lib/security'
+import { markSessionStart, clearSessionMarks } from '../../hooks/useSessionExpiry'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -31,19 +32,90 @@ export default function AdminLogin() {
   const [error, setError] = useState(false)
   const [errorMsg, setErrorMsg] = useState('Invalid credentials. Try again.')
   const [needs2FA, setNeeds2FA] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
 
-  // If redirected here with ?unauthorized=1, sign out any stale session
-  // If redirected with ?mfa=1, jump straight to the 2FA challenge
+  // - ?unauthorized=1  → force-signout + show message
+  // - ?mfa=1           → jump to 2FA challenge
+  // - ?expired=idle|absolute → show "Session expired" banner
+  // - Already logged in as admin? → skip login, go to dashboard
   useEffect(() => {
-    if (params.get('unauthorized')) {
-      signOut()
-      setError(true)
-      setErrorMsg('Your account is not authorized for admin access.')
+    let cancelled = false
+    ;(async () => {
+      const expired = params.get('expired')
+      if (expired) {
+        clearSessionMarks()
+        await signOut()
+        if (!cancelled) {
+          setError(true)
+          setErrorMsg(
+            expired === 'absolute'
+              ? 'Your 4-hour session ended. Please sign in again.'
+              : 'Signed out for inactivity. Please sign in again.',
+          )
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      if (params.get('unauthorized')) {
+        await signOut()
+        if (!cancelled) {
+          setError(true)
+          setErrorMsg('Your account is not authorized for admin access.')
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      if (params.get('mfa')) {
+        if (!cancelled) {
+          setNeeds2FA(true)
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      // No special params — check if we're already authenticated as an admin
+      const { data: sessionData } = await supabase.auth.getSession()
+      const session = sessionData?.session
+      if (!session) {
+        if (!cancelled) setCheckingSession(false)
+        return
+      }
+
+      // Verify admin row exists
+      const { data: adminRow } = await supabase
+        .from('admins')
+        .select('email')
+        .ilike('email', session.user.email ?? '')
+        .maybeSingle()
+
+      if (!adminRow) {
+        if (!cancelled) setCheckingSession(false)
+        return
+      }
+
+      // Check MFA level — if aal2 required but only aal1, show challenge
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal?.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+        if (!cancelled) {
+          setNeeds2FA(true)
+          setCheckingSession(false)
+        }
+        return
+      }
+
+      // Already logged in + admin + MFA satisfied → go to dashboard
+      if (!cancelled) {
+        markSessionStart()
+        navigate(ADMIN_DASHBOARD, { replace: true })
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    if (params.get('mfa')) {
-      setNeeds2FA(true)
-    }
-  }, [params])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,6 +180,7 @@ export default function AdminLogin() {
       return
     }
 
+    markSessionStart()
     setLoading(false)
     navigate(ADMIN_DASHBOARD)
   }
@@ -126,6 +199,32 @@ export default function AdminLogin() {
     transition: 'border-color 250ms',
   }
 
+  if (checkingSession) {
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          backgroundColor: VOID,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            border: `2px solid ${CREAM}20`,
+            borderTopColor: TEAL,
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
+
   if (needs2FA) {
     return (
       <div
@@ -139,7 +238,10 @@ export default function AdminLogin() {
         }}
       >
         <TwoFactorChallenge
-          onSuccess={() => navigate(ADMIN_DASHBOARD)}
+          onSuccess={() => {
+            markSessionStart()
+            navigate(ADMIN_DASHBOARD)
+          }}
           onCancel={async () => {
             await signOut()
             setNeeds2FA(false)

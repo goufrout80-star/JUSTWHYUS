@@ -42,9 +42,11 @@ Thumbs.db
 *.cert
 
 # ─── Database / Supabase internals ────────────
-# Never push migrations, seeds, or any SQL to the repo.
-# These contain structure/data that belong in the Supabase dashboard only.
-supabase/
+# Never push migrations or SQL to the repo.
+# Edge Functions ARE code and must be deployable — tracked.
+supabase/*
+!supabase/functions
+!supabase/functions/**
 *.sql
 *.sqlite
 *.sqlite3

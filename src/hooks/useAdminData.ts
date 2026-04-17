@@ -46,13 +46,14 @@ export interface AdminRow {
 export interface PendingInvite {
   id: string
   token: string
-  email: string
+  email: string | null
   display_name: string
   role: 'super_admin' | 'admin'
   invited_by: string
   expires_at: string
   used_at: string | null
   created_at: string
+  delivery: 'link' | 'email'
 }
 
 export interface AppSettingsRow {
@@ -208,7 +209,7 @@ export function useAdminData(actor: ActorInfo | null) {
       id,
       targetName ?? null,
     )
-    fetchAll()
+    await fetchAll()
   }
 
   const deleteRecord = async (
@@ -218,7 +219,7 @@ export function useAdminData(actor: ActorInfo | null) {
   ) => {
     await logActivity('deleted', table, id, targetName ?? null)
     await supabase.from(table).delete().eq('id', id)
-    fetchAll()
+    await fetchAll()
   }
 
   const genToken = () => {
@@ -228,34 +229,41 @@ export function useAdminData(actor: ActorInfo | null) {
   }
 
   const createInvite = async (
-    email: string,
+    email: string | null,
     display_name: string,
     role: 'admin' | 'super_admin' = 'admin',
+    delivery: 'link' | 'email' = 'link',
   ) => {
     const token = genToken()
     const { data, error } = await supabase
       .from('admin_invites')
       .insert({
         token,
-        email: email.toLowerCase().trim(),
+        email: email ? email.toLowerCase().trim() : null,
         display_name: display_name.trim(),
         role,
+        delivery,
         invited_by: actor?.email ?? 'system',
       })
       .select()
       .single()
     if (!error) {
-      await logActivity('invited', 'admin_invites', data?.id ?? null, email)
-      fetchAll()
+      await logActivity(
+        'invited',
+        'admin_invites',
+        data?.id ?? null,
+        email ?? display_name,
+      )
+      await fetchAll()
     }
     return { data: data as PendingInvite | null, error }
   }
 
-  const revokeInvite = async (id: string, email: string) => {
+  const revokeInvite = async (id: string, email: string | null) => {
     const { error } = await supabase.from('admin_invites').delete().eq('id', id)
     if (!error) {
-      await logActivity('removed', 'admin_invites', id, email)
-      fetchAll()
+      await logActivity('removed', 'admin_invites', id, email ?? 'link invite')
+      await fetchAll()
     }
     return { error }
   }
@@ -270,7 +278,7 @@ export function useAdminData(actor: ActorInfo | null) {
       .eq('id', id)
       .select()
       .single()
-    if (!error) fetchAll()
+    if (!error) await fetchAll()
     return { data: data as PendingInvite | null, error }
   }
 
@@ -278,7 +286,7 @@ export function useAdminData(actor: ActorInfo | null) {
     const { error } = await supabase.from('admins').delete().eq('id', id)
     if (!error) {
       await logActivity('removed', 'admins', id, email)
-      fetchAll()
+      await fetchAll()
     }
     return { error }
   }
@@ -288,7 +296,7 @@ export function useAdminData(actor: ActorInfo | null) {
       .from('admins')
       .update({ mfa_required: required })
       .eq('id', id)
-    if (!error) fetchAll()
+    if (!error) await fetchAll()
     return { error }
   }
 
@@ -297,7 +305,7 @@ export function useAdminData(actor: ActorInfo | null) {
       .from('app_settings')
       .update({ require_2fa_global: required, updated_at: new Date().toISOString() })
       .eq('id', 1)
-    if (!error) fetchAll()
+    if (!error) await fetchAll()
     return { error }
   }
 
