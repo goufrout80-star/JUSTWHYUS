@@ -140,56 +140,63 @@ export default function AdminLogin() {
 
     setLoading(true)
 
-    const { error: err } = await signIn(email, password)
+    try {
+      const { error: err } = await signIn(email, password)
 
-    if (err) {
-      const attempt = recordFailedAttempt(LOCKOUT_KEYS.LOGIN)
-      void logSecurityEvent({ event: 'login_fail', meta: { email } })
-      setLoading(false)
-      if (attempt.locked) {
-        void logSecurityEvent({ event: 'login_lockout', meta: { email } })
-        setErrorMsg(
-          `Too many failed attempts. Locked out for ${formatLockoutMs(attempt.lockMsLeft)}.`,
-        )
-      } else {
-        setErrorMsg(
-          `Invalid credentials. ${attempt.remainingAttempts} attempt${attempt.remainingAttempts === 1 ? '' : 's'} remaining.`,
-        )
+      if (err) {
+        const attempt = recordFailedAttempt(LOCKOUT_KEYS.LOGIN)
+        void logSecurityEvent({ event: 'login_fail', meta: { email } })
+        setLoading(false)
+        if (attempt.locked) {
+          void logSecurityEvent({ event: 'login_lockout', meta: { email } })
+          setErrorMsg(
+            `Too many failed attempts. Locked out for ${formatLockoutMs(attempt.lockMsLeft)}.`,
+          )
+        } else {
+          setErrorMsg(
+            `Invalid credentials. ${attempt.remainingAttempts} attempt${attempt.remainingAttempts === 1 ? '' : 's'} remaining.`,
+          )
+        }
+        setError(true)
+        return
       }
+
+      // Verify the signed-in user is actually in the admins table
+      const { data: adminRow } = await supabase
+        .from('admins')
+        .select('email')
+        .ilike('email', email)
+        .maybeSingle()
+
+      if (!adminRow) {
+        void logSecurityEvent({ event: 'unauthorized_admin_access', meta: { email } })
+        await signOut()
+        setLoading(false)
+        setErrorMsg('Your account is not authorized for admin access.')
+        setError(true)
+        return
+      }
+
+      // Success — clear any lockout counter
+      clearLockout(LOCKOUT_KEYS.LOGIN)
+
+      // Check if MFA challenge is needed
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aal?.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+        setLoading(false)
+        setNeeds2FA(true)
+        return
+      }
+
+      markSessionStart()
+      navigate(ADMIN_DASHBOARD)
+    } catch (err) {
+      console.error('[AdminLogin] sign-in error:', err)
+      setErrorMsg('Sign-in failed. Please try again.')
       setError(true)
-      return
-    }
-
-    // Verify the signed-in user is actually in the admins table
-    const { data: adminRow } = await supabase
-      .from('admins')
-      .select('email')
-      .ilike('email', email)
-      .maybeSingle()
-
-    if (!adminRow) {
-      void logSecurityEvent({ event: 'unauthorized_admin_access', meta: { email } })
-      await signOut()
+    } finally {
       setLoading(false)
-      setErrorMsg('Your account is not authorized for admin access.')
-      setError(true)
-      return
     }
-
-    // Success — clear any lockout counter
-    clearLockout(LOCKOUT_KEYS.LOGIN)
-
-    // Check if MFA challenge is needed
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (aal?.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
-      setLoading(false)
-      setNeeds2FA(true)
-      return
-    }
-
-    markSessionStart()
-    setLoading(false)
-    navigate(ADMIN_DASHBOARD)
   }
 
   const inputStyle: React.CSSProperties = {
