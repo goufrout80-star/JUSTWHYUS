@@ -15,7 +15,7 @@ import TwoFactorSetupPage from './pages/admin/TwoFactorSetupPage'
 import FeedbackPage from './pages/FeedbackPage'
 import ProtectedRoute from './components/admin/ProtectedRoute'
 import FeedbackWidget from './components/FeedbackWidget'
-import { useAdminAuth } from './hooks/useAdminAuth'
+import { useAdminAuth, AdminAuthProvider } from './hooks/useAdminAuth'
 import { rememberRoute } from './hooks/useSmartBack'
 import { ADMIN_SLUG, HONEYPOT_PATHS } from './config/security'
 import { showConsoleWarning } from './lib/security'
@@ -43,7 +43,7 @@ function GlobalFeedbackWidget() {
 
 export default function App() {
   return (
-    <>
+    <AdminAuthProvider>
       <BootSecurity />
       <RouteTracker />
       <GlobalFeedbackWidget />
@@ -109,6 +109,6 @@ export default function App() {
         {/* 404 catch-all */}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </AdminAuthProvider>
   )
 }

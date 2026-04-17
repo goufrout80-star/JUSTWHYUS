@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext, createContext, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
@@ -17,7 +18,47 @@ export interface AppSettings {
   require_2fa_global: boolean
 }
 
-export function useAdminAuth() {
+interface AdminAuthState {
+  session: Session | null
+  profile: AdminProfile | null
+  settings: AppSettings | null
+  role: AdminRole
+  isAdmin: boolean
+  isSuper: boolean
+  isFeedbackUser: boolean
+  aal: AAL
+  nextAal: AAL
+  mfaEnforced: boolean
+  mfaPending: boolean
+  mfaChallengeRequired: boolean
+  loading: boolean
+  refresh: () => Promise<void>
+}
+
+const defaultState: AdminAuthState = {
+  session: null,
+  profile: null,
+  settings: null,
+  role: null,
+  isAdmin: false,
+  isSuper: false,
+  isFeedbackUser: false,
+  aal: null,
+  nextAal: null,
+  mfaEnforced: false,
+  mfaPending: false,
+  mfaChallengeRequired: false,
+  loading: true,
+  refresh: async () => {},
+}
+
+const AdminAuthContext = createContext<AdminAuthState>(defaultState)
+
+/**
+ * Provider — mount ONCE near the app root.
+ * All auth init (getSession, onAuthStateChange) happens here only.
+ */
+export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [settings, setSettings] = useState<AppSettings | null>(null)
@@ -25,7 +66,7 @@ export function useAdminAuth() {
   const [nextAal, setNextAal] = useState<AAL>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadContext = async (s: Session | null) => {
+  const loadContext = useCallback(async (s: Session | null) => {
     if (!s?.user?.email) {
       setProfile(null)
       setSettings(null)
@@ -58,7 +99,7 @@ export function useAdminAuth() {
       setProfile(null)
       setSettings(null)
     }
-  }
+  }, [])
 
   useEffect(() => {
     let done = false
@@ -78,31 +119,28 @@ export function useAdminAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session)
-      await loadContext(session)
+    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+      setSession(s)
+      await loadContext(s)
     })
 
     return () => {
       subscription.unsubscribe()
       window.clearTimeout(timer)
     }
-  }, [])
+  }, [loadContext])
 
   const role: AdminRole = profile?.role ?? null
   const isAdmin = role === 'admin' || role === 'super_admin' || role === 'feedback_user'
   const isSuper = role === 'super_admin'
   const isFeedbackUser = role === 'feedback_user'
 
-  // Must enroll 2FA? (required by self or by global policy, but not yet enrolled)
   const mfaEnforced =
     !!profile && (profile.mfa_required || !!settings?.require_2fa_global)
   const mfaPending = mfaEnforced && !profile?.mfa_enabled
-
-  // Must complete a 2FA challenge? (user has MFA set up but session is still aal1)
   const mfaChallengeRequired = aal === 'aal1' && nextAal === 'aal2'
 
-  return {
+  const value: AdminAuthState = {
     session,
     profile,
     settings,
@@ -118,4 +156,15 @@ export function useAdminAuth() {
     loading,
     refresh: () => loadContext(session),
   }
+
+  return (
+    <AdminAuthContext.Provider value={value}>
+      {children}
+    </AdminAuthContext.Provider>
+  )
+}
+
+/** Hook — reads from the singleton context. Safe to call from many components. */
+export function useAdminAuth() {
+  return useContext(AdminAuthContext)
 }

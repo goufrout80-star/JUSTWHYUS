@@ -21,9 +21,6 @@ export const supabase = createClient(
   {
     auth: {
       storageKey: 'sb-jwu-auth',
-      // Prevent the 5-second navigator lock timeout that causes hangs when
-      // multiple components call getSession() concurrently (React renders).
-      lock: 'no-op' as 'no-op',
       detectSessionInUrl: true,
       persistSession: true,
     },
