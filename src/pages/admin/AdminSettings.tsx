@@ -63,7 +63,7 @@ export default function AdminSettings() {
         return
       }
       setEmailCodeSent(true)
-      setPwError('⚠️ If not received, check your spam folder')
+      setPwSuccess('Code sent! ⚠️ If not received, check your spam folder')
     } catch (err) {
       console.error('[send-otp-email] catch:', err)
       setPwError(`Error: ${String(err)}`)
