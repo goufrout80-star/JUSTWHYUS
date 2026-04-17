@@ -14,6 +14,7 @@ import {
   logSecurityEvent,
 } from '../../lib/security'
 import { markSessionStart, clearSessionMarks } from '../../hooks/useSessionExpiry'
+import { scorePassword } from '../../lib/passwordStrength'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -21,10 +22,13 @@ const CREAM = '#F0EBD8'
 const VOID = '#0a0a0a'
 const INK = '#0D1A14'
 
+type View = 'login' | 'forgot_email' | 'forgot_code' | 'forgot_password'
+
 export default function AdminLogin() {
   useDocumentHead({ title: 'Admin — JUST WHY US', noIndex: true })
   const navigate = useNavigate()
   const [params] = useSearchParams()
+  const [view, setView] = useState<View>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -33,6 +37,14 @@ export default function AdminLogin() {
   const [errorMsg, setErrorMsg] = useState('Invalid credentials. Try again.')
   const [needs2FA, setNeeds2FA] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
+
+  // Forgot password state
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [resetCodeSent, setResetCodeSent] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   // - ?unauthorized=1  → force-signout + show message
   // - ?mfa=1           → jump to 2FA challenge
@@ -193,6 +205,127 @@ export default function AdminLogin() {
     } catch (err) {
       console.error('[AdminLogin] sign-in error:', err)
       setErrorMsg('Sign-in failed. Please try again.')
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ── Forgot Password handlers ──
+  const handleSendResetCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(false)
+    if (!resetEmail.trim()) {
+      setErrorMsg('Email is required.')
+      setError(true)
+      return
+    }
+    setLoading(true)
+    try {
+      // Verify the email exists in admins table
+      const { data: adminRow } = await supabase
+        .from('admins')
+        .select('email, display_name')
+        .ilike('email', resetEmail.trim())
+        .maybeSingle()
+
+      if (!adminRow) {
+        setErrorMsg('Email not found in admin system.')
+        setError(true)
+        setLoading(false)
+        return
+      }
+
+      // Send OTP code
+      const resp = await supabase.functions.invoke('send-otp-email', {
+        body: { email: adminRow.email, name: adminRow.display_name || 'Admin', purpose: 'password_reset' },
+      })
+      console.log('[send-otp-email] reset response:', resp)
+      if (resp.error || !resp.data?.ok) {
+        const errorText = typeof resp.error === 'object' && 'message' in resp.error
+          ? resp.error.message
+          : String(resp.error)
+        setErrorMsg(`Error: ${errorText}`)
+        setError(true)
+        return
+      }
+      setResetCodeSent(true)
+      setView('forgot_code')
+    } catch (err) {
+      console.error('[send-otp-email] catch:', err)
+      setErrorMsg(`Error: ${String(err)}`)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyResetCode = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(false)
+    if (!resetCode.trim() || resetCode.trim().length !== 6) {
+      setErrorMsg('Enter the 6-digit code.')
+      setError(true)
+      return
+    }
+    setLoading(true)
+    try {
+      const resp = await supabase.functions.invoke('verify-otp', {
+        body: { email: resetEmail.trim(), code: resetCode.trim(), purpose: 'password_reset' },
+      })
+      console.log('[verify-otp] reset response:', resp)
+      if (resp.error || !resp.data?.ok) {
+        setErrorMsg('Invalid or expired code.')
+        setError(true)
+        return
+      }
+      setView('forgot_password')
+    } catch (err) {
+      console.error('[verify-otp] catch:', err)
+      setErrorMsg(`Error: ${String(err)}`)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(false)
+    const strength = scorePassword(newPassword)
+    if (!strength.ok) {
+      setErrorMsg('Password is not strong enough.')
+      setError(true)
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Passwords do not match.')
+      setError(true)
+      return
+    }
+    setLoading(true)
+    try {
+      const resp = await supabase.functions.invoke('reset-password', {
+        body: { email: resetEmail.trim(), newPassword },
+      })
+      console.log('[reset-password] response:', resp)
+      if (resp.error || !resp.data?.ok) {
+        setErrorMsg(resp.data?.error || 'Failed to reset password.')
+        setError(true)
+        return
+      }
+      setResetSuccess(true)
+      setTimeout(() => {
+        setView('login')
+        setResetSuccess(false)
+        setResetEmail('')
+        setResetCode('')
+        setNewPassword('')
+        setConfirmNewPassword('')
+      }, 3000)
+    } catch (err) {
+      console.error('[reset password] catch:', err)
+      setErrorMsg('Failed to reset password.')
       setError(true)
     } finally {
       setLoading(false)
@@ -489,7 +622,199 @@ export default function AdminLogin() {
           </button>
           <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
         </form>
+
+        {/* Forgot Password Link */}
+        <div style={{ textAlign: 'center', marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setView('forgot_email')
+              setError(false)
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(240,235,216,0.5)',
+              fontSize: 12,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            Forgot password?
+          </button>
+        </div>
       </div>
     </div>
   )
+
+  // ── Forgot Password: Enter Email ──
+  if (view === 'forgot_email') {
+    return (
+      <div style={{ minHeight: '100dvh', backgroundColor: VOID, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', width: '100%', maxWidth: 400, margin: '0 24px', backgroundColor: INK, border: '1px solid rgba(43,219,164,0.12)', borderRadius: 8, padding: '48px 40px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <LogoMark size={36} />
+            </div>
+            <span className="font-brand" style={{ fontSize: 16, color: CREAM, letterSpacing: '0.2em' }}>JUST WHY US</span>
+            <p style={{ fontSize: 12, color: 'rgba(240,235,216,0.35)', marginTop: 8 }}>Reset your password</p>
+          </div>
+          <form onSubmit={handleSendResetCode} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {error && (
+              <div style={{ background: 'rgba(255,92,56,0.08)', borderLeft: `2px solid ${CORAL}`, padding: '10px 14px', borderRadius: 4 }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: CORAL }}>{errorMsg}</span>
+              </div>
+            )}
+            <div>
+              <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(240,235,216,0.5)', marginBottom: 6 }}>EMAIL</label>
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="admin@email.com"
+                required
+                style={inputStyle}
+                onFocus={(e) => (e.currentTarget.style.borderColor = TEAL)}
+                onBlur={(e) => (e.currentTarget.style.borderColor = INK)}
+              />
+            </div>
+            <button type="submit" disabled={loading} className="font-brand" style={{ fontSize: 16, letterSpacing: '0.12em', color: VOID, backgroundColor: TEAL, width: '100%', padding: 14, borderRadius: 3, border: 'none', cursor: loading ? 'wait' : 'pointer', transition: 'background 200ms', opacity: loading ? 0.6 : 1 }}>
+              {loading ? 'SENDING...' : 'SEND RESET CODE'}
+            </button>
+            <button type="button" onClick={() => setView('login')} style={{ background: 'none', border: 'none', color: 'rgba(240,235,216,0.5)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', width: '100%' }}>
+              Back to login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Forgot Password: Enter Code ──
+  if (view === 'forgot_code') {
+    return (
+      <div style={{ minHeight: '100dvh', backgroundColor: VOID, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', width: '100%', maxWidth: 400, margin: '0 24px', backgroundColor: INK, border: '1px solid rgba(43,219,164,0.12)', borderRadius: 8, padding: '48px 40px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <LogoMark size={36} />
+            </div>
+            <span className="font-brand" style={{ fontSize: 16, color: CREAM, letterSpacing: '0.2em' }}>JUST WHY US</span>
+            <p style={{ fontSize: 12, color: 'rgba(240,235,216,0.35)', marginTop: 8 }}>Enter the code sent to your email</p>
+            <div style={{ fontSize: 11, color: 'rgba(240,235,216,0.35)', fontStyle: 'italic', backgroundColor: 'rgba(255,92,56,0.08)', padding: '8px 12px', borderRadius: 4, border: '1px solid rgba(255,92,56,0.2)', marginTop: 8, textAlign: 'center' }}>
+              ⚠️ If not received, check your spam folder
+            </div>
+          </div>
+          <form onSubmit={handleVerifyResetCode} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {error && (
+              <div style={{ background: 'rgba(255,92,56,0.08)', borderLeft: `2px solid ${CORAL}`, padding: '10px 14px', borderRadius: 4 }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: CORAL }}>{errorMsg}</span>
+              </div>
+            )}
+            <div>
+              <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(240,235,216,0.5)', marginBottom: 6 }}>6-DIGIT CODE</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={resetCode}
+                onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                required
+                style={{ ...inputStyle, textAlign: 'center', fontFamily: 'ui-monospace, monospace', fontSize: 22, letterSpacing: '0.5em' }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = TEAL)}
+                onBlur={(e) => (e.currentTarget.style.borderColor = INK)}
+              />
+            </div>
+            <button type="submit" disabled={loading || resetCode.length !== 6} className="font-brand" style={{ fontSize: 16, letterSpacing: '0.12em', color: VOID, backgroundColor: TEAL, width: '100%', padding: 14, borderRadius: 3, border: 'none', cursor: loading ? 'wait' : 'pointer', transition: 'background 200ms', opacity: loading || resetCode.length !== 6 ? 0.6 : 1 }}>
+              {loading ? 'VERIFYING...' : 'VERIFY'}
+            </button>
+            <button type="button" onClick={() => setView('login')} style={{ background: 'none', border: 'none', color: 'rgba(240,235,216,0.5)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', width: '100%' }}>
+              Back to login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Forgot Password: New Password ──
+  if (view === 'forgot_password') {
+    const strength = scorePassword(newPassword)
+    const passwordsMatch = newPassword.length > 0 && newPassword === confirmNewPassword
+    const canSubmit = strength.ok && passwordsMatch
+    return (
+      <div style={{ minHeight: '100dvh', backgroundColor: VOID, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', width: '100%', maxWidth: 400, margin: '0 24px', backgroundColor: INK, border: '1px solid rgba(43,219,164,0.12)', borderRadius: 8, padding: '48px 40px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <LogoMark size={36} />
+            </div>
+            <span className="font-brand" style={{ fontSize: 16, color: CREAM, letterSpacing: '0.2em' }}>JUST WHY US</span>
+            <p style={{ fontSize: 12, color: 'rgba(240,235,216,0.35)', marginTop: 8 }}>Set a new password</p>
+          </div>
+          <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {resetSuccess && (
+              <div style={{ background: 'rgba(43,219,164,0.08)', borderLeft: `2px solid ${TEAL}`, padding: '10px 14px', borderRadius: 4 }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: TEAL }}>Password reset successfully! Redirecting to login...</span>
+              </div>
+            )}
+            {error && (
+              <div style={{ background: 'rgba(255,92,56,0.08)', borderLeft: `2px solid ${CORAL}`, padding: '10px 14px', borderRadius: 4 }}>
+                <span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 400, fontSize: 13, color: CORAL }}>{errorMsg}</span>
+              </div>
+            )}
+            <div>
+              <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(240,235,216,0.5)', marginBottom: 6 }}>NEW PASSWORD</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={inputStyle}
+                onFocus={(e) => (e.currentTarget.style.borderColor = TEAL)}
+                onBlur={(e) => (e.currentTarget.style.borderColor = INK)}
+              />
+              {newPassword && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ height: 4, backgroundColor: VOID, borderRadius: 2, overflow: 'hidden', display: 'flex', gap: 2 }}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <div key={i} style={{ flex: 1, backgroundColor: i < strength.score ? (strength.score <= 1 ? CORAL : strength.score <= 2 ? '#FFB23C' : TEAL) : 'rgba(240,235,216,0.08)', transition: 'background 200ms' }} />
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(240,235,216,0.55)' }}>Strength: <span style={{ color: strength.ok ? TEAL : CORAL }}>{strength.label}</span></div>
+                </div>
+              )}
+            </div>
+            <div>
+              <label style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: 'rgba(240,235,216,0.5)', marginBottom: 6 }}>CONFIRM PASSWORD</label>
+              <input
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={inputStyle}
+                onFocus={(e) => (e.currentTarget.style.borderColor = TEAL)}
+                onBlur={(e) => (e.currentTarget.style.borderColor = INK)}
+              />
+              {confirmNewPassword && !passwordsMatch && <div style={{ color: CORAL, fontSize: 11, marginTop: 4 }}>Passwords don't match</div>}
+            </div>
+            <button type="submit" disabled={loading || !canSubmit} className="font-brand" style={{ fontSize: 16, letterSpacing: '0.12em', color: VOID, backgroundColor: TEAL, width: '100%', padding: 14, borderRadius: 3, border: 'none', cursor: loading ? 'wait' : 'pointer', transition: 'background 200ms', opacity: loading || !canSubmit ? 0.6 : 1 }}>
+              {loading ? 'RESETTING...' : 'RESET PASSWORD'}
+            </button>
+            <button type="button" onClick={() => setView('login')} style={{ background: 'none', border: 'none', color: 'rgba(240,235,216,0.5)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline', width: '100%' }}>
+              Cancel
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
