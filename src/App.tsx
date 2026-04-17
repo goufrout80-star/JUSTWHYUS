@@ -5,6 +5,8 @@ import Select from './pages/Select'
 import Brands from './pages/Brands'
 import Creators from './pages/Creators'
 import Forbidden from './pages/Forbidden'
+import NotFound from './pages/NotFound'
+import HoneypotAdmin from './pages/HoneypotAdmin'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminSettings from './pages/admin/AdminSettings'
@@ -12,6 +14,8 @@ import InviteClaim from './pages/admin/InviteClaim'
 import TwoFactorSetupPage from './pages/admin/TwoFactorSetupPage'
 import ProtectedRoute from './components/admin/ProtectedRoute'
 import { rememberRoute } from './hooks/useSmartBack'
+import { ADMIN_SLUG, HONEYPOT_PATHS } from './config/security'
+import { showConsoleWarning } from './lib/security'
 
 function RouteTracker() {
   const { pathname } = useLocation()
@@ -21,20 +25,36 @@ function RouteTracker() {
   return null
 }
 
+function BootSecurity() {
+  useEffect(() => {
+    showConsoleWarning()
+  }, [])
+  return null
+}
+
 export default function App() {
   return (
     <>
+      <BootSecurity />
       <RouteTracker />
       <Routes>
+        {/* Public */}
         <Route path="/" element={<Home />} />
         <Route path="/select" element={<Select />} />
         <Route path="/brands" element={<Brands />} />
         <Route path="/creators" element={<Creators />} />
+
+        {/* Error pages */}
         <Route path="/403" element={<Forbidden />} />
+        <Route path="/404" element={<NotFound />} />
+
+        {/* Invite claim (accepted anywhere) */}
         <Route path="/invite/:token" element={<InviteClaim />} />
-        <Route path="/admin" element={<AdminLogin />} />
+
+        {/* ─── SECRET ADMIN AREA — path is env-configurable ─── */}
+        <Route path={`/${ADMIN_SLUG}`} element={<AdminLogin />} />
         <Route
-          path="/admin/dashboard"
+          path={`/${ADMIN_SLUG}/dashboard`}
           element={
             <ProtectedRoute>
               <AdminDashboard />
@@ -42,7 +62,7 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/settings"
+          path={`/${ADMIN_SLUG}/settings`}
           element={
             <ProtectedRoute>
               <AdminSettings />
@@ -50,14 +70,24 @@ export default function App() {
           }
         />
         <Route
-          path="/admin/setup-2fa"
+          path={`/${ADMIN_SLUG}/setup-2fa`}
           element={
             <ProtectedRoute allowPending2FA>
               <TwoFactorSetupPage />
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Forbidden />} />
+
+        {/* ─── HONEYPOTS — decoys for common admin-hunting bots ─── */}
+        {HONEYPOT_PATHS.map((p) => (
+          <Route key={p} path={p} element={<HoneypotAdmin />} />
+        ))}
+        {HONEYPOT_PATHS.map((p) => (
+          <Route key={`${p}/*`} path={`${p}/*`} element={<HoneypotAdmin />} />
+        ))}
+
+        {/* 404 catch-all */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   )

@@ -5,6 +5,7 @@ import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { scorePassword } from '../../lib/passwordStrength'
 import TwoFactorSetup from '../../components/admin/TwoFactorSetup'
 import LogoMark from '../../components/ui/LogoMark'
+import { ADMIN_DASHBOARD } from '../../config/security'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -162,8 +163,8 @@ export default function InviteClaim() {
     setStep('mfa_prompt')
   }
 
-  const handleSkipMfa = () => navigate('/admin/dashboard')
-  const handleMfaDone = () => navigate('/admin/dashboard')
+  const handleSkipMfa = () => navigate(ADMIN_DASHBOARD)
+  const handleMfaDone = () => navigate(ADMIN_DASHBOARD)
 
   // ----- RENDER HELPERS -----
 

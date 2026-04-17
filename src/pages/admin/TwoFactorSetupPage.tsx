@@ -3,6 +3,7 @@ import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { signOut } from '../../lib/supabase'
 import TwoFactorSetup from '../../components/admin/TwoFactorSetup'
+import { ADMIN_BASE, ADMIN_DASHBOARD, ADMIN_SETTINGS } from '../../config/security'
 import LogoMark from '../../components/ui/LogoMark'
 
 const TEAL = '#2BDBA4'
@@ -16,16 +17,16 @@ export default function TwoFactorSetupPage() {
 
   const handleDone = async () => {
     await refresh()
-    navigate('/admin/dashboard')
+    navigate(ADMIN_DASHBOARD)
   }
 
   const handleCancel = async () => {
     // If 2FA is enforced, cancel = sign out. Otherwise just go back.
     if (mfaEnforced) {
       await signOut()
-      navigate('/admin')
+      navigate(ADMIN_BASE)
     } else {
-      navigate('/admin/settings')
+      navigate(ADMIN_SETTINGS)
     }
   }
 

@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
+import { ADMIN_BASE, ADMIN_SETUP_2FA } from '../../config/security'
 
 interface Props {
   children: React.ReactNode
@@ -41,7 +42,7 @@ export default function ProtectedRoute({ children, allowPending2FA }: Props) {
   }
 
   if (!session) {
-    return <Navigate to="/admin" replace />
+    return <Navigate to={ADMIN_BASE} replace />
   }
 
   // Logged in but not in admins table → 403
@@ -51,12 +52,12 @@ export default function ProtectedRoute({ children, allowPending2FA }: Props) {
 
   // 2FA challenge required (has factor, session still aal1) → back to login for challenge
   if (mfaChallengeRequired) {
-    return <Navigate to="/admin?mfa=1" replace />
+    return <Navigate to={`${ADMIN_BASE}?mfa=1`} replace />
   }
 
   // 2FA enrollment pending (required but not yet set up) → setup page
-  if (mfaPending && !allowPending2FA && location.pathname !== '/admin/setup-2fa') {
-    return <Navigate to="/admin/setup-2fa" replace />
+  if (mfaPending && !allowPending2FA && location.pathname !== ADMIN_SETUP_2FA) {
+    return <Navigate to={ADMIN_SETUP_2FA} replace />
   }
 
   return <>{children}</>

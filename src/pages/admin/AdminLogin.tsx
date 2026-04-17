@@ -4,6 +4,15 @@ import { signIn, signOut, supabase } from '../../lib/supabase'
 import LogoMark from '../../components/ui/LogoMark'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import TwoFactorChallenge from '../../components/admin/TwoFactorChallenge'
+import { ADMIN_DASHBOARD } from '../../config/security'
+import { LOCKOUT_KEYS } from '../../config/security'
+import {
+  checkLockout,
+  recordFailedAttempt,
+  clearLockout,
+  formatLockoutMs,
+  logSecurityEvent,
+} from '../../lib/security'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -39,13 +48,35 @@ export default function AdminLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(false)
+
+    // Check lockout
+    const lockMs = checkLockout(LOCKOUT_KEYS.LOGIN)
+    if (lockMs > 0) {
+      setErrorMsg(
+        `Too many failed attempts. Try again in ${formatLockoutMs(lockMs)}.`,
+      )
+      setError(true)
+      return
+    }
+
     setLoading(true)
 
     const { error: err } = await signIn(email, password)
 
     if (err) {
+      const attempt = recordFailedAttempt(LOCKOUT_KEYS.LOGIN)
+      void logSecurityEvent({ event: 'login_fail', meta: { email } })
       setLoading(false)
-      setErrorMsg('Invalid credentials. Try again.')
+      if (attempt.locked) {
+        void logSecurityEvent({ event: 'login_lockout', meta: { email } })
+        setErrorMsg(
+          `Too many failed attempts. Locked out for ${formatLockoutMs(attempt.lockMsLeft)}.`,
+        )
+      } else {
+        setErrorMsg(
+          `Invalid credentials. ${attempt.remainingAttempts} attempt${attempt.remainingAttempts === 1 ? '' : 's'} remaining.`,
+        )
+      }
       setError(true)
       return
     }
@@ -58,12 +89,16 @@ export default function AdminLogin() {
       .maybeSingle()
 
     if (!adminRow) {
+      void logSecurityEvent({ event: 'unauthorized_admin_access', meta: { email } })
       await signOut()
       setLoading(false)
       setErrorMsg('Your account is not authorized for admin access.')
       setError(true)
       return
     }
+
+    // Success — clear any lockout counter
+    clearLockout(LOCKOUT_KEYS.LOGIN)
 
     // Check if MFA challenge is needed
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -74,7 +109,7 @@ export default function AdminLogin() {
     }
 
     setLoading(false)
-    navigate('/admin/dashboard')
+    navigate(ADMIN_DASHBOARD)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -104,7 +139,7 @@ export default function AdminLogin() {
         }}
       >
         <TwoFactorChallenge
-          onSuccess={() => navigate('/admin/dashboard')}
+          onSuccess={() => navigate(ADMIN_DASHBOARD)}
           onCancel={async () => {
             await signOut()
             setNeeds2FA(false)

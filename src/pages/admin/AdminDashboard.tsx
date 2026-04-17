@@ -10,6 +10,7 @@ import CreatorApplicationsTable from '../../components/admin/CreatorApplications
 import TeamPanel from '../../components/admin/TeamPanel'
 import ActivityPanel from '../../components/admin/ActivityPanel'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
+import { ADMIN_BASE, ADMIN_SETTINGS } from '../../config/security'
 
 const TEAL = '#2BDBA4'
 const CORAL = '#FF5C38'
@@ -56,7 +57,7 @@ export default function AdminDashboard() {
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/admin')
+    navigate(ADMIN_BASE)
   }
 
   const pendingBrands = brandRequests.filter((r) => r.status === 'pending').length
@@ -148,7 +149,7 @@ export default function AdminDashboard() {
             </span>
           </div>
           <button
-            onClick={() => navigate('/admin/settings')}
+            onClick={() => navigate(ADMIN_SETTINGS)}
             title="Settings"
             style={{
               background: 'none',

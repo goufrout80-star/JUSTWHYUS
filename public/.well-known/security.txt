@@ -1,0 +1,13 @@
+Contact: mailto:mmmmorad123@gmail.com
+Expires: 2027-12-31T23:59:59Z
+Preferred-Languages: en
+Canonical: https://justwhyus.com/.well-known/security.txt
+Policy: https://justwhyus.com/
+Acknowledgments: https://justwhyus.com/
+
+# JUST WHY US — Responsible Disclosure
+# If you discover a security vulnerability, please email us privately before
+# disclosing it publicly. We will respond within 72 hours.
+#
+# Scope: justwhyus.com
+# Out of scope: rate-limiting, missing best-practice headers on static assets.

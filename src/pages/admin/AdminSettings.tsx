@@ -4,6 +4,7 @@ import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { supabase, signOut } from '../../lib/supabase'
 import TwoFactorSetup from '../../components/admin/TwoFactorSetup'
+import { ADMIN_BASE, ADMIN_DASHBOARD } from '../../config/security'
 import LogoMark from '../../components/ui/LogoMark'
 
 const TEAL = '#2BDBA4'
@@ -102,7 +103,7 @@ export default function AdminSettings() {
           </span>
         </div>
         <button
-          onClick={() => navigate('/admin/dashboard')}
+          onClick={() => navigate(ADMIN_DASHBOARD)}
           style={{
             background: 'none',
             border: `1px solid ${CREAM}20`,
@@ -316,7 +317,7 @@ export default function AdminSettings() {
           <button
             onClick={async () => {
               await signOut()
-              navigate('/admin')
+              navigate(ADMIN_BASE)
             }}
             style={{
               background: 'none',

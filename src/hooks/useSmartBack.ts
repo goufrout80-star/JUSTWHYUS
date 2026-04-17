@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ADMIN_BASE } from '../config/security'
 
 const LAST_KEY = 'jwu_last_route'
 
@@ -7,9 +8,11 @@ export function rememberRoute(path: string) {
   try {
     // Don't remember auth/error routes as "the place to go back to"
     if (
+      path.startsWith(ADMIN_BASE) ||
       path.startsWith('/admin') ||
       path.startsWith('/invite') ||
-      path === '/403'
+      path === '/403' ||
+      path === '/404'
     ) {
       return
     }
