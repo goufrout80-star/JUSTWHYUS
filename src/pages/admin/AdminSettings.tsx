@@ -50,13 +50,22 @@ export default function AdminSettings() {
       const resp = await supabase.functions.invoke('send-otp-email', {
         body: { email: profile.email, name: profile.display_name, purpose: 'password_change' },
       })
-      if (resp.error || !resp.data?.ok) {
-        setPwError(resp.data?.error || resp.error?.message || 'Failed to send code.')
+      console.log('[send-otp-email] response:', resp)
+      if (resp.error) {
+        const errorText = typeof resp.error === 'object' && 'message' in resp.error
+          ? resp.error.message
+          : String(resp.error)
+        setPwError(`Error: ${errorText}`)
+        return
+      }
+      if (!resp.data?.ok) {
+        setPwError(resp.data?.error || 'Failed to send code.')
         return
       }
       setEmailCodeSent(true)
-    } catch {
-      setPwError('Failed to send verification code.')
+    } catch (err) {
+      console.error('[send-otp-email] catch:', err)
+      setPwError(`Error: ${String(err)}`)
     } finally {
       setPwBusy(false)
     }
@@ -79,14 +88,23 @@ export default function AdminSettings() {
         const resp = await supabase.functions.invoke('verify-otp', {
           body: { email: profile.email, code: emailCode.trim(), purpose: 'password_change' },
         })
-        if (resp.error || !resp.data?.ok) {
+        console.log('[verify-otp] response:', resp)
+        if (resp.error) {
+          const errorText = typeof resp.error === 'object' && 'message' in resp.error
+            ? resp.error.message
+            : String(resp.error)
+          setPwError(`Error: ${errorText}`)
+          return
+        }
+        if (!resp.data?.ok) {
           setPwError(resp.data?.error || 'Invalid or expired code.')
           return
         }
         setPwVerified(true)
       }
-    } catch {
-      setPwError('Verification failed. Try again.')
+    } catch (err) {
+      console.error('[verify-otp] catch:', err)
+      setPwError(`Error: ${String(err)}`)
     } finally {
       setPwBusy(false)
     }
