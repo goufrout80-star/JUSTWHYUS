@@ -7,6 +7,10 @@ export interface FeedbackItem {
   user_name: string
   page_url: string
   section_label: string
+  element_tag: string | null
+  element_id: string | null
+  element_selector: string | null
+  element_text: string | null
   note: string
   status: 'new' | 'reviewed' | 'resolved'
   created_at: string
