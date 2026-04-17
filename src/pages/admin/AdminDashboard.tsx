@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '../../lib/supabase'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
@@ -24,12 +24,7 @@ type Tab = 'brands' | 'creators' | 'team' | 'activity' | 'feedback'
 export default function AdminDashboard() {
   useDocumentHead({ title: 'Dashboard — JUST WHY US Admin', noIndex: true })
   const navigate = useNavigate()
-  const { session, profile, isSuper, isFeedbackUser } = useAdminAuth()
-
-  // Feedback users get redirected to their own page
-  useEffect(() => {
-    if (isFeedbackUser) navigate('/feedback', { replace: true })
-  }, [isFeedbackUser, navigate])
+  const { session, profile, isSuper } = useAdminAuth()
 
   const actor = useMemo(
     () =>
@@ -57,6 +52,7 @@ export default function AdminDashboard() {
     removeAdmin,
     setAdminMfaRequired,
     setGlobalMfaRequired,
+    setFeedbackAccess,
     refetch,
   } = useAdminData(actor)
 
@@ -239,6 +235,7 @@ export default function AdminDashboard() {
           onRemoveAdmin={removeAdmin}
           onSetAdminMfaRequired={setAdminMfaRequired}
           onSetGlobalMfaRequired={setGlobalMfaRequired}
+          onSetFeedbackAccess={setFeedbackAccess}
           onRefresh={refetch}
         />
       )}

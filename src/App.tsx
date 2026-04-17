@@ -36,8 +36,8 @@ function BootSecurity() {
 }
 
 function GlobalFeedbackWidget() {
-  const { profile, isFeedbackUser } = useAdminAuth()
-  if (!isFeedbackUser || !profile) return null
+  const { profile, hasFeedbackAccess } = useAdminAuth()
+  if (!hasFeedbackAccess || !profile) return null
   return <FeedbackWidget userEmail={profile.email} userName={profile.display_name} />
 }
 

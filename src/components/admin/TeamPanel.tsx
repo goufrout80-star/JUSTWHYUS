@@ -17,7 +17,7 @@ interface Props {
   onCreateInvite: (
     email: string | null,
     name: string,
-    role: 'admin' | 'super_admin' | 'feedback_user',
+    role: 'admin' | 'super_admin',
     delivery: 'link' | 'email',
   ) => Promise<{ data: PendingInvite | null; error: unknown }>
   onRevokeInvite: (id: string, email: string | null) => Promise<{ error: unknown }>
@@ -25,6 +25,7 @@ interface Props {
   onRemoveAdmin: (id: string, email: string) => Promise<{ error: unknown }>
   onSetAdminMfaRequired: (id: string, required: boolean) => Promise<{ error: unknown }>
   onSetGlobalMfaRequired: (required: boolean) => Promise<{ error: unknown }>
+  onSetFeedbackAccess: (id: string, enabled: boolean) => Promise<{ error: unknown }>
   onRefresh?: () => Promise<void> | void
 }
 
@@ -56,6 +57,7 @@ export default function TeamPanel({
   onRemoveAdmin,
   onSetAdminMfaRequired,
   onSetGlobalMfaRequired,
+  onSetFeedbackAccess,
   onRefresh,
 }: Props) {
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -235,16 +237,14 @@ export default function TeamPanel({
                           textTransform: 'uppercase',
                           padding: '3px 8px',
                           borderRadius: 999,
-                          color: inv.role === 'super_admin' ? TEAL : inv.role === 'feedback_user' ? '#FFB23C' : 'rgba(240,235,216,0.8)',
+                          color: inv.role === 'super_admin' ? TEAL : 'rgba(240,235,216,0.8)',
                           backgroundColor:
                             inv.role === 'super_admin'
                               ? 'rgba(43,219,164,0.1)'
-                              : inv.role === 'feedback_user'
-                                ? 'rgba(255,178,60,0.1)'
-                                : 'rgba(240,235,216,0.05)',
+                              : 'rgba(240,235,216,0.05)',
                         }}
                       >
-                        {inv.role === 'super_admin' ? 'Super' : inv.role === 'feedback_user' ? 'Feedback' : 'Admin'}
+                        {inv.role === 'super_admin' ? 'Super' : 'Admin'}
                       </span>
                     </td>
                     <td style={{ ...tdStyle, color: expired ? CORAL : 'rgba(240,235,216,0.5)' }}>
@@ -306,7 +306,7 @@ export default function TeamPanel({
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
           <thead>
             <tr style={{ backgroundColor: '#080808' }}>
-              {['Name', 'Email', 'Role', '2FA', 'Required', 'Joined', 'Actions'].map((c) => (
+              {['Name', 'Email', 'Role', '2FA', 'Required', 'Feedback', 'Joined', 'Actions'].map((c) => (
                 <th key={c} style={thStyle}>{c}</th>
               ))}
             </tr>
@@ -314,7 +314,7 @@ export default function TeamPanel({
           <tbody>
             {admins.length === 0 ? (
               <tr>
-                <td colSpan={7} style={emptyStyle}>No team members yet.</td>
+                <td colSpan={8} style={emptyStyle}>No team members yet.</td>
               </tr>
             ) : (
               admins.map((a) => {
@@ -340,16 +340,14 @@ export default function TeamPanel({
                           textTransform: 'uppercase',
                           padding: '3px 8px',
                           borderRadius: 999,
-                          color: a.role === 'super_admin' ? TEAL : a.role === 'feedback_user' ? '#FFB23C' : 'rgba(240,235,216,0.8)',
+                          color: a.role === 'super_admin' ? TEAL : 'rgba(240,235,216,0.8)',
                           backgroundColor:
                             a.role === 'super_admin'
                               ? 'rgba(43,219,164,0.1)'
-                              : a.role === 'feedback_user'
-                                ? 'rgba(255,178,60,0.1)'
-                                : 'rgba(240,235,216,0.05)',
+                              : 'rgba(240,235,216,0.05)',
                         }}
                       >
-                        {a.role === 'super_admin' ? 'Super Admin' : a.role === 'feedback_user' ? 'Feedback User' : 'Admin'}
+                        {a.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                       </span>
                     </td>
                     <td style={tdStyle}>
@@ -386,6 +384,32 @@ export default function TeamPanel({
                       ) : (
                         <span style={{ fontSize: 11, color: 'rgba(240,235,216,0.35)' }}>
                           {a.mfa_required ? 'Required' : '—'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      {isSuper ? (
+                        <button
+                          onClick={() => onSetFeedbackAccess(a.id, !a.feedback_access)}
+                          style={{
+                            background: a.feedback_access ? '#FFB23C' : 'transparent',
+                            color: a.feedback_access ? VOID : CREAM,
+                            border: `1px solid ${a.feedback_access ? '#FFB23C' : CREAM + '30'}`,
+                            borderRadius: 999,
+                            padding: '3px 10px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            letterSpacing: '0.15em',
+                            textTransform: 'uppercase',
+                            cursor: 'pointer',
+                            fontFamily: 'Inter, sans-serif',
+                          }}
+                        >
+                          {a.feedback_access ? 'On' : 'Off'}
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 11, color: a.feedback_access ? '#FFB23C' : 'rgba(240,235,216,0.35)' }}>
+                          {a.feedback_access ? 'On' : '—'}
                         </span>
                       )}
                     </td>

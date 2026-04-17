@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
-export type AdminRole = 'super_admin' | 'admin' | 'feedback_user' | null
+export type AdminRole = 'super_admin' | 'admin' | null
 export type AAL = 'aal1' | 'aal2' | null
 
 export interface AdminProfile {
@@ -12,6 +12,7 @@ export interface AdminProfile {
   role: Exclude<AdminRole, null>
   mfa_enabled: boolean
   mfa_required: boolean
+  feedback_access: boolean
 }
 
 export interface AppSettings {
@@ -25,7 +26,7 @@ interface AdminAuthState {
   role: AdminRole
   isAdmin: boolean
   isSuper: boolean
-  isFeedbackUser: boolean
+  hasFeedbackAccess: boolean
   aal: AAL
   nextAal: AAL
   mfaEnforced: boolean
@@ -42,7 +43,7 @@ const defaultState: AdminAuthState = {
   role: null,
   isAdmin: false,
   isSuper: false,
-  isFeedbackUser: false,
+  hasFeedbackAccess: false,
   aal: null,
   nextAal: null,
   mfaEnforced: false,
@@ -79,7 +80,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       const [adminRes, settingsRes, aalRes] = await Promise.all([
         supabase
           .from('admins')
-          .select('email, display_name, role, mfa_enabled, mfa_required')
+          .select('email, display_name, role, mfa_enabled, mfa_required, feedback_access')
           .ilike('email', s.user.email)
           .maybeSingle(),
         supabase
@@ -131,9 +132,9 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, [loadContext])
 
   const role: AdminRole = profile?.role ?? null
-  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'feedback_user'
+  const isAdmin = role === 'admin' || role === 'super_admin'
   const isSuper = role === 'super_admin'
-  const isFeedbackUser = role === 'feedback_user'
+  const hasFeedbackAccess = !!profile?.feedback_access
 
   const mfaEnforced =
     !!profile && (profile.mfa_required || !!settings?.require_2fa_global)
@@ -147,7 +148,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     role,
     isAdmin,
     isSuper,
-    isFeedbackUser,
+    hasFeedbackAccess,
     aal,
     nextAal,
     mfaEnforced,
