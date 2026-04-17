@@ -86,35 +86,44 @@ export default function InviteModal({ open, onClose, onCreateInvite }: Props) {
     }
 
     // Email mode: call the Resend Edge Function
-    const { data: session } = await supabase.auth.getSession()
-    const invitedBy =
-      session?.session?.user?.email ?? 'A JUST WHY US super admin'
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const invitedBy =
+        session?.session?.user?.email ?? 'A JUST WHY US super admin'
 
-    const { data: sendData, error: sendErr } = await supabase.functions.invoke(
-      'send-invite-email',
-      {
-        body: {
-          token: data.token,
-          email: data.email,
-          name: data.display_name,
-          role: data.role,
-          invitedBy,
+      const { data: sendData, error: sendErr } = await supabase.functions.invoke(
+        'send-invite-email',
+        {
+          body: {
+            token: data.token,
+            email: data.email,
+            name: data.display_name,
+            role: data.role,
+            invitedBy,
+          },
         },
-      },
-    )
-    setBusy(false)
+      )
+      setBusy(false)
 
-    if (sendErr || !sendData?.ok) {
+      if (sendErr || !sendData?.ok) {
+        setError(
+          `Invite created but email failed to send: ${
+            sendData?.error ?? sendErr?.message ?? 'unknown'
+          }. You can copy the link below instead.`,
+        )
+        setResultLink(`${origin}/invite/${data.token}?preverified=1`)
+        return
+      }
+
+      setEmailSent(true)
+    } catch (err: unknown) {
+      setBusy(false)
+      const msg = err instanceof Error ? err.message : 'unknown'
       setError(
-        `Invite created but email failed to send: ${
-          sendData?.error ?? sendErr?.message ?? 'unknown'
-        }. You can copy the link below instead.`,
+        `Invite created but email failed (${msg}). Copy the link below instead.`,
       )
       setResultLink(`${origin}/invite/${data.token}?preverified=1`)
-      return
     }
-
-    setEmailSent(true)
   }
 
   const copy = (link: string) => {

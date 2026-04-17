@@ -34,30 +34,39 @@ export function useAdminAuth() {
       return
     }
 
-    const [adminRes, settingsRes, aalRes] = await Promise.all([
-      supabase
-        .from('admins')
-        .select('email, display_name, role, mfa_enabled, mfa_required')
-        .ilike('email', s.user.email)
-        .maybeSingle(),
-      supabase
-        .from('app_settings')
-        .select('require_2fa_global')
-        .eq('id', 1)
-        .maybeSingle(),
-      supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
-    ])
+    try {
+      const [adminRes, settingsRes, aalRes] = await Promise.all([
+        supabase
+          .from('admins')
+          .select('email, display_name, role, mfa_enabled, mfa_required')
+          .ilike('email', s.user.email)
+          .maybeSingle(),
+        supabase
+          .from('app_settings')
+          .select('require_2fa_global')
+          .eq('id', 1)
+          .maybeSingle(),
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+      ])
 
-    setProfile((adminRes.data as AdminProfile) ?? null)
-    setSettings((settingsRes.data as AppSettings) ?? null)
-    setAal((aalRes.data?.currentLevel as AAL) ?? null)
-    setNextAal((aalRes.data?.nextLevel as AAL) ?? null)
+      setProfile((adminRes.data as AdminProfile) ?? null)
+      setSettings((settingsRes.data as AppSettings) ?? null)
+      setAal((aalRes.data?.currentLevel as AAL) ?? null)
+      setNextAal((aalRes.data?.nextLevel as AAL) ?? null)
+    } catch (err) {
+      console.error('[useAdminAuth] loadContext error:', err)
+      setProfile(null)
+      setSettings(null)
+    }
   }
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       await loadContext(session)
+    }).catch(() => {
+      /* session read failed — treat as logged out */
+    }).finally(() => {
       setLoading(false)
     })
 
