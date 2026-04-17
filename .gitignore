@@ -1,0 +1,72 @@
+# ==============================================
+# JUST WHY US — .gitignore
+# ==============================================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies / build output
+node_modules/
+dist/
+dist-ssr/
+build/
+.cache/
+.parcel-cache/
+*.local
+*.tsbuildinfo
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ─── Secrets & env ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# ─── Database / Supabase internals ────────────
+# Never push migrations, seeds, or any SQL to the repo.
+# These contain structure/data that belong in the Supabase dashboard only.
+supabase/
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# ─── OS & misc ────────────────────────────────
+desktop.ini
+*.bak
+*.tmp
+*.orig
+
+# ─── Editor / AI assistant artifacts ──────────
+.windsurf/
+.cursor/
+.claude/
+.codeium/
+.trae/
+
+# ─── Test / coverage ──────────────────────────
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/
+.netlify/

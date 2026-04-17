@@ -1,0 +1,11 @@
+# JUST WHY US — robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/*
+
+# Crawl delay (polite)
+Crawl-delay: 1
+
+# Sitemap
+Sitemap: https://justwhyus.com/sitemap.xml
