@@ -46,16 +46,20 @@ export default function AdminSettings() {
     if (!profile?.email) return
     setPwBusy(true)
     setPwError(null)
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: profile.email,
-      options: { shouldCreateUser: false },
-    })
-    setPwBusy(false)
-    if (err) {
-      setPwError(err.message)
-      return
+    try {
+      const resp = await supabase.functions.invoke('send-otp-email', {
+        body: { email: profile.email, name: profile.display_name, purpose: 'password_change' },
+      })
+      if (resp.error || !resp.data?.ok) {
+        setPwError(resp.data?.error || resp.error?.message || 'Failed to send code.')
+        return
+      }
+      setEmailCodeSent(true)
+    } catch {
+      setPwError('Failed to send verification code.')
+    } finally {
+      setPwBusy(false)
     }
-    setEmailCodeSent(true)
   }
 
   const handleVerifyOld = async () => {
@@ -63,28 +67,28 @@ export default function AdminSettings() {
     setPwBusy(true)
     setPwError(null)
 
-    if (pwVerifyMode === 'password') {
-      // Re-authenticate with current password
-      const { error: err } = await signIn(profile.email, currentPw)
-      setPwBusy(false)
-      if (err) {
-        setPwError('Current password is incorrect.')
-        return
+    try {
+      if (pwVerifyMode === 'password') {
+        const { error: err } = await signIn(profile.email, currentPw)
+        if (err) {
+          setPwError('Current password is incorrect.')
+          return
+        }
+        setPwVerified(true)
+      } else {
+        const resp = await supabase.functions.invoke('verify-otp', {
+          body: { email: profile.email, code: emailCode.trim(), purpose: 'password_change' },
+        })
+        if (resp.error || !resp.data?.ok) {
+          setPwError(resp.data?.error || 'Invalid or expired code.')
+          return
+        }
+        setPwVerified(true)
       }
-      setPwVerified(true)
-    } else {
-      // Verify email OTP
-      const { error: err } = await supabase.auth.verifyOtp({
-        email: profile.email,
-        token: emailCode.trim(),
-        type: 'email',
-      })
+    } catch {
+      setPwError('Verification failed. Try again.')
+    } finally {
       setPwBusy(false)
-      if (err) {
-        setPwError('Invalid or expired code.')
-        return
-      }
-      setPwVerified(true)
     }
   }
 
@@ -105,6 +109,11 @@ export default function AdminSettings() {
     setConfirmNewPw('')
     setPwVerified(false)
     setEmailCodeSent(false)
+  }
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate(ADMIN_BASE, { replace: true })
   }
 
   const handleDisable2FA = async () => {
@@ -605,21 +614,27 @@ export default function AdminSettings() {
             End your current admin session.
           </div>
           <button
-            onClick={async () => {
-              await signOut()
-              navigate(ADMIN_BASE)
-            }}
+            onClick={handleSignOut}
             style={{
-              background: 'none',
-              border: `1px solid ${CORAL}60`,
+              background: `${CORAL}12`,
+              border: `1px solid ${CORAL}40`,
               borderRadius: 4,
-              padding: '10px 20px',
+              padding: '12px 24px',
               color: CORAL,
               fontSize: 12,
               fontWeight: 700,
               letterSpacing: '0.2em',
               textTransform: 'uppercase',
               cursor: 'pointer',
+              transition: 'all 200ms',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = CORAL
+              e.currentTarget.style.color = CREAM
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = `${CORAL}12`
+              e.currentTarget.style.color = CORAL
             }}
           >
             Sign Out
