@@ -40,79 +40,86 @@ export default function AdminLogin() {
   // - Already logged in as admin? → skip login, go to dashboard
   useEffect(() => {
     let cancelled = false
+    const finish = () => { if (!cancelled) setCheckingSession(false) }
+
+    // Safety net — never spin longer than 6s
+    const timer = window.setTimeout(finish, 6000)
+
     ;(async () => {
-      const expired = params.get('expired')
-      if (expired) {
-        clearSessionMarks()
-        await signOut()
-        if (!cancelled) {
-          setError(true)
-          setErrorMsg(
-            expired === 'absolute'
-              ? 'Your 4-hour session ended. Please sign in again.'
-              : 'Signed out for inactivity. Please sign in again.',
-          )
-          setCheckingSession(false)
+      try {
+        const expired = params.get('expired')
+        if (expired) {
+          clearSessionMarks()
+          await signOut()
+          if (!cancelled) {
+            setError(true)
+            setErrorMsg(
+              expired === 'absolute'
+                ? 'Your 4-hour session ended. Please sign in again.'
+                : 'Signed out for inactivity. Please sign in again.',
+            )
+          }
+          finish()
+          return
         }
-        return
-      }
 
-      if (params.get('unauthorized')) {
-        await signOut()
-        if (!cancelled) {
-          setError(true)
-          setErrorMsg('Your account is not authorized for admin access.')
-          setCheckingSession(false)
+        if (params.get('unauthorized')) {
+          await signOut()
+          if (!cancelled) {
+            setError(true)
+            setErrorMsg('Your account is not authorized for admin access.')
+          }
+          finish()
+          return
         }
-        return
-      }
 
-      if (params.get('mfa')) {
-        if (!cancelled) {
-          setNeeds2FA(true)
-          setCheckingSession(false)
+        if (params.get('mfa')) {
+          if (!cancelled) setNeeds2FA(true)
+          finish()
+          return
         }
-        return
-      }
 
-      // No special params — check if we're already authenticated as an admin
-      const { data: sessionData } = await supabase.auth.getSession()
-      const session = sessionData?.session
-      if (!session) {
-        if (!cancelled) setCheckingSession(false)
-        return
-      }
-
-      // Verify admin row exists
-      const { data: adminRow } = await supabase
-        .from('admins')
-        .select('email')
-        .ilike('email', session.user.email ?? '')
-        .maybeSingle()
-
-      if (!adminRow) {
-        if (!cancelled) setCheckingSession(false)
-        return
-      }
-
-      // Check MFA level — if aal2 required but only aal1, show challenge
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-      if (aal?.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
-        if (!cancelled) {
-          setNeeds2FA(true)
-          setCheckingSession(false)
+        // No special params — check if we're already authenticated as an admin
+        const { data: sessionData } = await supabase.auth.getSession()
+        const session = sessionData?.session
+        if (!session) {
+          finish()
+          return
         }
-        return
-      }
 
-      // Already logged in + admin + MFA satisfied → go to dashboard
-      if (!cancelled) {
-        markSessionStart()
-        navigate(ADMIN_DASHBOARD, { replace: true })
+        // Verify admin row exists
+        const { data: adminRow } = await supabase
+          .from('admins')
+          .select('email')
+          .ilike('email', session.user.email ?? '')
+          .maybeSingle()
+
+        if (!adminRow) {
+          finish()
+          return
+        }
+
+        // Check MFA level — if aal2 required but only aal1, show challenge
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (aal?.nextLevel === 'aal2' && aal.currentLevel === 'aal1') {
+          if (!cancelled) setNeeds2FA(true)
+          finish()
+          return
+        }
+
+        // Already logged in + admin + MFA satisfied → go to dashboard
+        if (!cancelled) {
+          markSessionStart()
+          navigate(ADMIN_DASHBOARD, { replace: true })
+        }
+      } catch (err) {
+        console.error('[AdminLogin] session check failed:', err)
+        finish()
       }
     })()
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

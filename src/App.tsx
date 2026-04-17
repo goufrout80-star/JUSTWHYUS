@@ -12,7 +12,10 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminSettings from './pages/admin/AdminSettings'
 import InviteClaim from './pages/admin/InviteClaim'
 import TwoFactorSetupPage from './pages/admin/TwoFactorSetupPage'
+import FeedbackPage from './pages/FeedbackPage'
 import ProtectedRoute from './components/admin/ProtectedRoute'
+import FeedbackWidget from './components/FeedbackWidget'
+import { useAdminAuth } from './hooks/useAdminAuth'
 import { rememberRoute } from './hooks/useSmartBack'
 import { ADMIN_SLUG, HONEYPOT_PATHS } from './config/security'
 import { showConsoleWarning } from './lib/security'
@@ -32,11 +35,18 @@ function BootSecurity() {
   return null
 }
 
+function GlobalFeedbackWidget() {
+  const { profile, isFeedbackUser } = useAdminAuth()
+  if (!isFeedbackUser || !profile) return null
+  return <FeedbackWidget userEmail={profile.email} userName={profile.display_name} />
+}
+
 export default function App() {
   return (
     <>
       <BootSecurity />
       <RouteTracker />
+      <GlobalFeedbackWidget />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
@@ -50,6 +60,16 @@ export default function App() {
 
         {/* Invite claim (accepted anywhere) */}
         <Route path="/invite/:token" element={<InviteClaim />} />
+
+        {/* Feedback page (feedback users) */}
+        <Route
+          path="/feedback"
+          element={
+            <ProtectedRoute>
+              <FeedbackPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* ─── SECRET ADMIN AREA — path is env-configurable ─── */}
         <Route path={`/${ADMIN_SLUG}`} element={<AdminLogin />} />

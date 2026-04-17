@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
-import { supabase, signOut } from '../../lib/supabase'
+import { supabase, signOut, signIn } from '../../lib/supabase'
+import { scorePassword } from '../../lib/passwordStrength'
 import TwoFactorSetup from '../../components/admin/TwoFactorSetup'
 import { ADMIN_BASE, ADMIN_DASHBOARD } from '../../config/security'
 import LogoMark from '../../components/ui/LogoMark'
@@ -13,6 +14,8 @@ const CREAM = '#F0EBD8'
 const VOID = '#080808'
 const INK = '#0D1A14'
 
+type PwVerifyMode = 'password' | 'email'
+
 export default function AdminSettings() {
   useDocumentHead({ title: 'Settings — JUST WHY US Admin', noIndex: true })
   const navigate = useNavigate()
@@ -22,6 +25,87 @@ export default function AdminSettings() {
   const [disableCode, setDisableCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // ── Password change state ──
+  const [pwVerifyMode, setPwVerifyMode] = useState<PwVerifyMode>('password')
+  const [currentPw, setCurrentPw] = useState('')
+  const [emailCode, setEmailCode] = useState('')
+  const [emailCodeSent, setEmailCodeSent] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmNewPw, setConfirmNewPw] = useState('')
+  const [pwBusy, setPwBusy] = useState(false)
+  const [pwError, setPwError] = useState<string | null>(null)
+  const [pwSuccess, setPwSuccess] = useState<string | null>(null)
+  const [pwVerified, setPwVerified] = useState(false)
+
+  const pwStrength = scorePassword(newPw)
+  const pwMatch = newPw.length > 0 && newPw === confirmNewPw
+  const canSubmitPw = pwStrength.ok && pwMatch && pwVerified
+
+  const handleSendEmailCode = async () => {
+    if (!profile?.email) return
+    setPwBusy(true)
+    setPwError(null)
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: profile.email,
+      options: { shouldCreateUser: false },
+    })
+    setPwBusy(false)
+    if (err) {
+      setPwError(err.message)
+      return
+    }
+    setEmailCodeSent(true)
+  }
+
+  const handleVerifyOld = async () => {
+    if (!profile?.email) return
+    setPwBusy(true)
+    setPwError(null)
+
+    if (pwVerifyMode === 'password') {
+      // Re-authenticate with current password
+      const { error: err } = await signIn(profile.email, currentPw)
+      setPwBusy(false)
+      if (err) {
+        setPwError('Current password is incorrect.')
+        return
+      }
+      setPwVerified(true)
+    } else {
+      // Verify email OTP
+      const { error: err } = await supabase.auth.verifyOtp({
+        email: profile.email,
+        token: emailCode.trim(),
+        type: 'email',
+      })
+      setPwBusy(false)
+      if (err) {
+        setPwError('Invalid or expired code.')
+        return
+      }
+      setPwVerified(true)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!canSubmitPw) return
+    setPwBusy(true)
+    setPwError(null)
+    const { error: err } = await supabase.auth.updateUser({ password: newPw })
+    setPwBusy(false)
+    if (err) {
+      setPwError(err.message)
+      return
+    }
+    setPwSuccess('Password changed successfully.')
+    setCurrentPw('')
+    setEmailCode('')
+    setNewPw('')
+    setConfirmNewPw('')
+    setPwVerified(false)
+    setEmailCodeSent(false)
+  }
 
   const handleDisable2FA = async () => {
     if (!disableCode) return
@@ -298,6 +382,212 @@ export default function AdminSettings() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+        </section>
+
+        {/* ── Change Password ── */}
+        <section
+          style={{
+            backgroundColor: INK,
+            border: '1px solid rgba(43,219,164,0.12)',
+            borderRadius: 8,
+            padding: 24,
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Change Password</div>
+          <div style={{ fontSize: 13, color: 'rgba(240,235,216,0.5)', marginBottom: 16 }}>
+            Verify your identity first, then set a new password.
+          </div>
+
+          {pwSuccess && (
+            <div style={{ color: TEAL, fontSize: 13, marginBottom: 12, padding: '8px 12px', borderRadius: 4, backgroundColor: 'rgba(43,219,164,0.08)' }}>
+              {pwSuccess}
+            </div>
+          )}
+          {pwError && (
+            <div style={{ color: CORAL, fontSize: 13, marginBottom: 12 }}>{pwError}</div>
+          )}
+
+          {/* Step 1: Verify identity */}
+          {!pwVerified && (
+            <div>
+              {/* Mode toggle */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14, background: VOID, padding: 3, borderRadius: 5 }}>
+                <button
+                  onClick={() => { setPwVerifyMode('password'); setPwError(null) }}
+                  style={{
+                    flex: 1, padding: '8px 10px', border: 'none', borderRadius: 3,
+                    background: pwVerifyMode === 'password' ? INK : 'transparent',
+                    color: pwVerifyMode === 'password' ? TEAL : 'rgba(240,235,216,0.45)',
+                    fontWeight: 700, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase' as const,
+                    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  Current Password
+                </button>
+                <button
+                  onClick={() => { setPwVerifyMode('email'); setPwError(null) }}
+                  style={{
+                    flex: 1, padding: '8px 10px', border: 'none', borderRadius: 3,
+                    background: pwVerifyMode === 'email' ? INK : 'transparent',
+                    color: pwVerifyMode === 'email' ? TEAL : 'rgba(240,235,216,0.45)',
+                    fontWeight: 700, fontSize: 11, letterSpacing: '0.15em', textTransform: 'uppercase' as const,
+                    cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                  }}
+                >
+                  Email Code
+                </button>
+              </div>
+
+              {pwVerifyMode === 'password' ? (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input
+                    type="password"
+                    value={currentPw}
+                    onChange={(e) => setCurrentPw(e.target.value)}
+                    placeholder="Enter current password"
+                    autoComplete="current-password"
+                    style={{
+                      flex: 1, backgroundColor: VOID, border: `1px solid ${INK}`, borderRadius: 4,
+                      padding: '10px 14px', fontSize: 14, color: CREAM, outline: 'none',
+                      fontFamily: 'Inter, sans-serif',
+                    }}
+                  />
+                  <button
+                    onClick={handleVerifyOld}
+                    disabled={pwBusy || !currentPw}
+                    style={{
+                      backgroundColor: TEAL, color: VOID, border: 'none', borderRadius: 4,
+                      padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
+                      textTransform: 'uppercase' as const, cursor: pwBusy ? 'wait' : 'pointer',
+                      opacity: pwBusy || !currentPw ? 0.5 : 1,
+                    }}
+                  >
+                    {pwBusy ? '...' : 'Verify'}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  {!emailCodeSent ? (
+                    <button
+                      onClick={handleSendEmailCode}
+                      disabled={pwBusy}
+                      style={{
+                        backgroundColor: TEAL, color: VOID, border: 'none', borderRadius: 4,
+                        padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
+                        textTransform: 'uppercase' as const, cursor: pwBusy ? 'wait' : 'pointer',
+                        opacity: pwBusy ? 0.5 : 1,
+                      }}
+                    >
+                      {pwBusy ? 'Sending...' : `Send Code to ${profile?.email}`}
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={emailCode}
+                        onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000"
+                        style={{
+                          flex: 1, backgroundColor: VOID, border: `1px solid ${INK}`, borderRadius: 4,
+                          padding: '10px 14px', fontFamily: 'ui-monospace, monospace', fontSize: 16,
+                          letterSpacing: '0.3em', color: CREAM, textAlign: 'center', outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={handleVerifyOld}
+                        disabled={pwBusy || emailCode.length !== 6}
+                        style={{
+                          backgroundColor: TEAL, color: VOID, border: 'none', borderRadius: 4,
+                          padding: '10px 18px', fontSize: 11, fontWeight: 700, letterSpacing: '0.2em',
+                          textTransform: 'uppercase' as const, cursor: pwBusy ? 'wait' : 'pointer',
+                          opacity: pwBusy || emailCode.length !== 6 ? 0.5 : 1,
+                        }}
+                      >
+                        {pwBusy ? '...' : 'Verify'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: New password (only after verification) */}
+          {pwVerified && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ color: TEAL, fontSize: 12, fontWeight: 700, letterSpacing: '0.15em' }}>
+                ✓ IDENTITY VERIFIED
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(240,235,216,0.5)', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPw}
+                  onChange={(e) => setNewPw(e.target.value)}
+                  style={{
+                    width: '100%', backgroundColor: VOID, border: `1px solid ${INK}`, borderRadius: 4,
+                    padding: '10px 14px', fontSize: 14, color: CREAM, outline: 'none',
+                    fontFamily: 'Inter, sans-serif', marginTop: 6, boxSizing: 'border-box',
+                  }}
+                />
+                {newPw && (
+                  <div style={{ marginTop: 6 }}>
+                    <div style={{ height: 4, backgroundColor: VOID, borderRadius: 2, overflow: 'hidden', display: 'flex', gap: 2 }}>
+                      {[0, 1, 2, 3].map((i) => (
+                        <div key={i} style={{
+                          flex: 1,
+                          backgroundColor: i < pwStrength.score
+                            ? pwStrength.score <= 1 ? CORAL : pwStrength.score <= 2 ? '#FFB23C' : TEAL
+                            : 'rgba(240,235,216,0.08)',
+                          transition: 'background 200ms',
+                        }} />
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 4, fontSize: 11, color: 'rgba(240,235,216,0.55)' }}>
+                      <span style={{ color: pwStrength.ok ? TEAL : CORAL }}>{pwStrength.label}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(240,235,216,0.5)', letterSpacing: '0.15em', textTransform: 'uppercase' as const }}>
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmNewPw}
+                  onChange={(e) => setConfirmNewPw(e.target.value)}
+                  style={{
+                    width: '100%', backgroundColor: VOID, border: `1px solid ${INK}`, borderRadius: 4,
+                    padding: '10px 14px', fontSize: 14, color: CREAM, outline: 'none',
+                    fontFamily: 'Inter, sans-serif', marginTop: 6, boxSizing: 'border-box',
+                  }}
+                />
+                {confirmNewPw && !pwMatch && (
+                  <div style={{ color: CORAL, fontSize: 11, marginTop: 4 }}>Passwords don't match</div>
+                )}
+              </div>
+              <button
+                onClick={handleChangePassword}
+                disabled={!canSubmitPw || pwBusy}
+                style={{
+                  backgroundColor: TEAL, color: VOID, border: 'none', borderRadius: 4,
+                  padding: '12px 20px', fontSize: 12, fontWeight: 700, letterSpacing: '0.2em',
+                  textTransform: 'uppercase' as const, cursor: !canSubmitPw || pwBusy ? 'wait' : 'pointer',
+                  opacity: !canSubmitPw || pwBusy ? 0.5 : 1, marginTop: 4,
+                }}
+              >
+                {pwBusy ? 'Changing...' : 'Change Password'}
+              </button>
             </div>
           )}
         </section>

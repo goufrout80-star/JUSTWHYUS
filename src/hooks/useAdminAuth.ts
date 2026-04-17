@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 
-export type AdminRole = 'super_admin' | 'admin' | null
+export type AdminRole = 'super_admin' | 'admin' | 'feedback_user' | null
 export type AAL = 'aal1' | 'aal2' | null
 
 export interface AdminProfile {
@@ -61,14 +61,20 @@ export function useAdminAuth() {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-      await loadContext(session)
-    }).catch(() => {
-      /* session read failed — treat as logged out */
-    }).finally(() => {
-      setLoading(false)
-    })
+    let done = false
+    const finish = () => {
+      if (!done) { done = true; setLoading(false) }
+    }
+
+    // Hard safety-net: never spin longer than 6 seconds
+    const timer = window.setTimeout(finish, 6000)
+
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      setSession(s)
+      await loadContext(s)
+    }).catch((err) => {
+      console.error('[useAdminAuth] getSession failed:', err)
+    }).finally(finish)
 
     const {
       data: { subscription },
@@ -77,12 +83,16 @@ export function useAdminAuth() {
       await loadContext(session)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      window.clearTimeout(timer)
+    }
   }, [])
 
   const role: AdminRole = profile?.role ?? null
-  const isAdmin = role === 'admin' || role === 'super_admin'
+  const isAdmin = role === 'admin' || role === 'super_admin' || role === 'feedback_user'
   const isSuper = role === 'super_admin'
+  const isFeedbackUser = role === 'feedback_user'
 
   // Must enroll 2FA? (required by self or by global policy, but not yet enrolled)
   const mfaEnforced =
@@ -99,6 +109,7 @@ export function useAdminAuth() {
     role,
     isAdmin,
     isSuper,
+    isFeedbackUser,
     aal,
     nextAal,
     mfaEnforced,

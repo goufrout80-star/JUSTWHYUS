@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signOut } from '../../lib/supabase'
 import { useAdminAuth } from '../../hooks/useAdminAuth'
@@ -9,6 +9,7 @@ import BrandRequestsTable from '../../components/admin/BrandRequestsTable'
 import CreatorApplicationsTable from '../../components/admin/CreatorApplicationsTable'
 import TeamPanel from '../../components/admin/TeamPanel'
 import ActivityPanel from '../../components/admin/ActivityPanel'
+import FeedbackInbox from '../../components/admin/FeedbackInbox'
 import { useDocumentHead } from '../../hooks/useDocumentHead'
 import { ADMIN_BASE, ADMIN_SETTINGS } from '../../config/security'
 
@@ -18,12 +19,17 @@ const CREAM = '#F0EBD8'
 const VOID = '#0a0a0a'
 const INK = '#0D1A14'
 
-type Tab = 'brands' | 'creators' | 'team' | 'activity'
+type Tab = 'brands' | 'creators' | 'team' | 'activity' | 'feedback'
 
 export default function AdminDashboard() {
   useDocumentHead({ title: 'Dashboard — JUST WHY US Admin', noIndex: true })
   const navigate = useNavigate()
-  const { session, profile, isSuper } = useAdminAuth()
+  const { session, profile, isSuper, isFeedbackUser } = useAdminAuth()
+
+  // Feedback users get redirected to their own page
+  useEffect(() => {
+    if (isFeedbackUser) navigate('/feedback', { replace: true })
+  }, [isFeedbackUser, navigate])
 
   const actor = useMemo(
     () =>
@@ -97,8 +103,9 @@ export default function AdminDashboard() {
           {([
             { key: 'brands' as Tab, label: 'Brands' },
             { key: 'creators' as Tab, label: 'Creators' },
-            { key: 'team' as Tab, label: 'Team' },
+            ...(isSuper ? [{ key: 'team' as Tab, label: 'Team' }] : []),
             { key: 'activity' as Tab, label: 'Activity' },
+            ...(isSuper ? [{ key: 'feedback' as Tab, label: 'Feedback' }] : []),
           ]).map((t) => (
             <button
               key={t.key}
@@ -236,7 +243,10 @@ export default function AdminDashboard() {
         />
       )}
       {tab === 'activity' && (
-        <ActivityPanel data={activity} loading={loading} />
+        <ActivityPanel data={activity} loading={loading} isSuper={isSuper} />
+      )}
+      {tab === 'feedback' && isSuper && (
+        <FeedbackInbox />
       )}
     </div>
   )

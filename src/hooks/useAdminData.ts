@@ -36,7 +36,7 @@ export interface AdminRow {
   id: string
   email: string
   display_name: string
-  role: 'super_admin' | 'admin'
+  role: 'super_admin' | 'admin' | 'feedback_user'
   invited_by: string | null
   created_at: string
   mfa_enabled: boolean
@@ -48,7 +48,7 @@ export interface PendingInvite {
   token: string
   email: string | null
   display_name: string
-  role: 'super_admin' | 'admin'
+  role: 'super_admin' | 'admin' | 'feedback_user'
   invited_by: string
   expires_at: string
   used_at: string | null
@@ -231,7 +231,7 @@ export function useAdminData(actor: ActorInfo | null) {
   const createInvite = async (
     email: string | null,
     display_name: string,
-    role: 'admin' | 'super_admin' = 'admin',
+    role: 'admin' | 'super_admin' | 'feedback_user' = 'admin',
     delivery: 'link' | 'email' = 'link',
   ) => {
     const token = genToken()

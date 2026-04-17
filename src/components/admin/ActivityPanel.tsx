@@ -8,7 +8,11 @@ const INK = '#0D1A14'
 interface Props {
   data: ActivityRow[]
   loading: boolean
+  isSuper: boolean
 }
+
+// Tables that regular admins can see in the activity log
+const ADMIN_VISIBLE_TABLES = new Set(['brand_requests', 'creator_applications'])
 
 const actionMeta: Record<ActivityRow['action'], { color: string; verb: string }> = {
   approved: { color: TEAL, verb: 'approved' },
@@ -37,7 +41,12 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString()
 }
 
-export default function ActivityPanel({ data, loading }: Props) {
+export default function ActivityPanel({ data, loading, isSuper }: Props) {
+  // Regular admins only see brand/creator activity, super admins see everything
+  const filtered = isSuper
+    ? data
+    : data.filter((r) => ADMIN_VISIBLE_TABLES.has(r.target_table))
+
   return (
     <div style={{ padding: '0 32px 32px' }}>
       <div
@@ -69,7 +78,7 @@ export default function ActivityPanel({ data, loading }: Props) {
             borderRadius: 999,
           }}
         >
-          {data.length}
+          {filtered.length}
         </span>
       </div>
 
@@ -93,7 +102,7 @@ export default function ActivityPanel({ data, loading }: Props) {
           >
             Loading...
           </div>
-        ) : data.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div
             style={{
               padding: 60,
@@ -107,7 +116,7 @@ export default function ActivityPanel({ data, loading }: Props) {
           </div>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {data.map((row) => {
+            {filtered.map((row) => {
               const meta = actionMeta[row.action]
               return (
                 <li

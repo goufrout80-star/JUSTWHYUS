@@ -17,7 +17,7 @@ interface Props {
   onCreateInvite: (
     email: string | null,
     name: string,
-    role: 'admin' | 'super_admin',
+    role: 'admin' | 'super_admin' | 'feedback_user',
     delivery: 'link' | 'email',
   ) => Promise<{ data: PendingInvite | null; error: unknown }>
   onRevokeInvite: (id: string, email: string | null) => Promise<{ error: unknown }>

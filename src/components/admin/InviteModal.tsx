@@ -9,7 +9,7 @@ const VOID = '#080808'
 const INK = '#0D1A14'
 
 type Mode = 'link' | 'email'
-type Role = 'admin' | 'super_admin'
+type Role = 'admin' | 'super_admin' | 'feedback_user'
 
 interface Props {
   open: boolean
@@ -245,6 +245,7 @@ export default function InviteModal({ open, onClose, onCreateInvite }: Props) {
               >
                 <option value="admin">Admin</option>
                 <option value="super_admin">Super Admin</option>
+                <option value="feedback_user">Feedback User</option>
               </select>
             </Field>
 
