@@ -396,7 +396,7 @@ export default function AdminLogin() {
     )
   }
 
-  return (
+  if (view === 'login') return (
     <div
       style={{
         minHeight: '100dvh',
