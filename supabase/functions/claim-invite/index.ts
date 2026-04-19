@@ -76,14 +76,17 @@ serve(async (req) => {
     //    vouched for it via either email-click or our own Resend OTP).
     let userId: string | null = null
 
-    // Try to find existing auth user by email
-    const { data: existing } = await sb.auth.admin.listUsers({
-      page: 1,
-      perPage: 1,
-    })
-    const match = existing?.users?.find(
-      (u) => (u.email ?? '').toLowerCase() === email,
-    )
+    // Try to find existing auth user by paginating through listUsers
+    let match: { id: string; email?: string | null } | undefined
+    for (let page = 1; page <= 10; page++) {
+      const { data: pageData } = await sb.auth.admin.listUsers({ page, perPage: 200 })
+      if (!pageData?.users?.length) break
+      match = pageData.users.find(
+        (u) => (u.email ?? '').toLowerCase() === email,
+      )
+      if (match) break
+      if (pageData.users.length < 200) break
+    }
 
     if (match) {
       userId = match.id
@@ -99,8 +102,28 @@ serve(async (req) => {
         email_confirm: true,
         user_metadata: { display_name: invite.display_name },
       })
-      if (createErr) return json({ ok: false, error: `create_user: ${createErr.message}` }, 500)
-      userId = created?.user?.id ?? null
+      if (createErr) {
+        // Fallback: user may already exist but wasn't found in paginated list
+        // (e.g. rare pagination edge case). Try finding again after error.
+        if (createErr.message?.toLowerCase().includes('already')) {
+          const { data: retry } = await sb.auth.admin.listUsers({ page: 1, perPage: 1000 })
+          const again = retry?.users?.find((u) => (u.email ?? '').toLowerCase() === email)
+          if (again) {
+            userId = again.id
+            const { error: updErr } = await sb.auth.admin.updateUserById(again.id, {
+              password,
+              email_confirm: true,
+            })
+            if (updErr) return json({ ok: false, error: `update_user: ${updErr.message}` }, 500)
+          } else {
+            return json({ ok: false, error: `create_user: ${createErr.message}` }, 500)
+          }
+        } else {
+          return json({ ok: false, error: `create_user: ${createErr.message}` }, 500)
+        }
+      } else {
+        userId = created?.user?.id ?? null
+      }
     }
 
     if (!userId) return json({ ok: false, error: 'no_user_id' }, 500)
